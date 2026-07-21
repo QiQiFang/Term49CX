@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!--
+   Copyright (c) 2011-2015 BlackBerry Limited.
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+   http://www.apache.org/licenses/LICENSE-2.0
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+   -->
+
+<qnx xmlns="http://www.qnx.com/schemas/application/1.0">
+    <id>com.example.Term49_Classic</id>
+    <asset path="share/terminfo">terminfo</asset>
+    <asset path="share/root">root</asset>
+    <asset path="share/NOTICE">NOTICE</asset>
+    <asset path="share/LICENSE">LICENSE</asset>
+    <asset path="share/README">README</asset>
+    <asset path="share/README45">README45</asset>
+    <asset path="icons/term4986x86.png">term4986x86.png</asset>
+    <asset path="icons/term4990x90.png">term4990x90.png</asset>
+    <asset path="icons/term4996x96.png">term4996x96.png</asset>
+    <asset path="icons/term49110x110.png">term49110x110.png</asset>
+    <asset path="icons/term49144x144.png">term49144x144.png</asset>
+    
+    <asset path="external/fonts/CascadiaMonoPL-Regular.ttf">fonts/CascadiaMonoPL-Regular.ttf</asset>
+    <asset path="external/fonts/LICENSE-Cascadia">fonts/LICENSE-Cascadia</asset>
+    <asset path="external/lib/libconfig.so" type="Qnx/Elf">lib/libconfig.so.11</asset>
+    <asset path="external/lib/libSDL12.so" type="Qnx/Elf">lib/libSDL12.so</asset>
+    <asset path="external/lib/libTouchControlOverlay.so" type="Qnx/Elf">lib/libTouchControlOverlay.so</asset>
+    <configuration name="Device-Debug">
+       <platformArchitecture>armle-v7</platformArchitecture>
+       <asset path="Device-Debug/Term49" entry="true" type="Qnx/Elf">Term49</asset>
+    </configuration>
+    <configuration name="Device-Release">
+       <platformArchitecture>armle-v7</platformArchitecture>
+       <asset path="Device-Release/Term49" entry="true" type="Qnx/Elf">Term49</asset>
+    </configuration>
+
+    <name>Term49C</name>
+    <versionNumber>1.0.0</versionNumber>
+    <buildId>1</buildId>
+
+    <!-- May have multiple values for each language. See samples or xsd schema file. -->
+    <description>The Term49 application</description>
+
+    <!--  Must match the developer name of your developer certificate. -->
+    <author>Package-Author</author>
+    <!--  Unique author ID assigned by signing authority. Required if using debug tokens. -->
+    <authorId>Package-Author-Id</authorId>
+
+    <initialWindow>
+      <autoOrients>true</autoOrients>
+      <systemChrome>none</systemChrome>
+    </initialWindow>
+
+    <icon>
+      <image>term4986x86.png</image>
+      <image>term4990x90.png</image>
+      <image>term4996x96.png</image>
+      <image>term49110x110.png</image>
+      <image>term49144x144.png</image>
+    </icon>
+
+    <!-- Request permission to execute native code.  Required for native applications. -->
+    <permission system="true">run_native</permission>
+    <permission>access_shared</permission>
+    <permission>run_when_backgrounded</permission>
+    <permission>bbm_connect</permission>
+    <permission>access_pimdomain_calendars</permission>
+    <permission>use_camera</permission>
+    <permission>use_camera_desktop</permission>
+    <permission>access_pimdomain_contacts</permission>
+    <permission>read_device_identifying_information</permission>
+    <permission>use_gamepad</permission>
+    <permission>access_pimdomain_messages</permission>
+    <permission>access_internet</permission>
+    <permission>access_location_services</permission>
+    <permission>record_audio</permission>
+    <permission>read_personally_identifiable_information</permission>
+    <permission>access_pimdomain_notebooks</permission>
+    <permission>access_notify_settings_control</permission>
+    <permission>access_phone</permission>
+    <permission>read_phonecall_details</permission>
+    <permission>access_pimdomain_calllogs</permission>
+    <permission>control_phone</permission>
+    <permission>post_notification</permission>
+    <permission system="true">_sys_use_consumer_push</permission>
+    <permission system="true">_sys_run_headless</permission>
+    <permission system="true">_sys_headless_nostop</permission>
+    <permission>access_sms_mms</permission>
+    <permission>access_wifi_public</permission>
+
+
+    <!-- Ensure that shared libraries in the package are found at run-time. -->
+    <env var="LD_LIBRARY_PATH" value="app/native/lib"/>
+
+</qnx>

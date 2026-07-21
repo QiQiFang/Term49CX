@@ -1,0 +1,57 @@
+diff --git a/src/video/playbook/SDL_playbookevents.c b/src/video/playbook/SDL_playbookevents.c
+index f21b118..39355f5 100644
+--- a/src/video/playbook/SDL_playbookevents.c
++++ b/src/video/playbook/SDL_playbookevents.c
+@@ -545,6 +545,12 @@ static int TranslateVKB(int sym, int mods, int flags, int scan, int cap, SDL_key
+ 
+ #ifdef RAW_KEYBOARD_EVENTS
+ extern void handleKeyboardEvent(screen_event_t event);
++/* Trackpad on devices like the BlackBerry Classic (Q20) shows up as a
++ * joystick input device. Let the application decide what to do with it. */
++extern void handleTrackpadEvent(screen_event_t event);
++/* Belt keys (send/end/back) on the BlackBerry Classic arrive as navigator
++ * syskey events. Returns nonzero if the application handled the key. */
++extern int handleSyskeyEvent(int syskey);
+ #else
+ 
+ static void handleKeyboardEvent(screen_event_t event)
+@@ -777,6 +783,18 @@ void handleNavigatorEvent(_THIS, bps_event_t *event)
+ 	case NAVIGATOR_SWIPE_START:
+ 		//fprintf(stderr, "Swipe start\n");
+ 		break;
++#ifdef RAW_KEYBOARD_EVENTS
++	case NAVIGATOR_SYSKEY_PRESS:
++	{
++		/* Hardware belt keys (BlackBerry Classic, 10.3.1+). Ask the app
++		 * whether it handles the key and tell the navigator either way. */
++		int syskey = navigator_event_get_syskey_key(event);
++		const char *syskey_id = navigator_event_get_syskey_id(event);
++		int handled = handleSyskeyEvent(syskey);
++		navigator_syskey_press_response(syskey_id, handled ? true : false);
++	}
++		break;
++#endif
+ 	case NAVIGATOR_LOW_MEMORY:
+ 		//fprintf(stderr, "Low memory\n"); // TODO: Anything we can do?
+ 		break;
+@@ -833,7 +851,7 @@ void handleScreenEvent(_THIS, bps_event_t *event)
+ 
+ 	screen_window_t window;
+ 	screen_get_event_property_pv(se, SCREEN_PROPERTY_WINDOW, (void **)&window);
+-	if (!window && type != SCREEN_EVENT_KEYBOARD)
++	if (!window && type != SCREEN_EVENT_KEYBOARD && type != SCREEN_EVENT_JOYSTICK)
+ 		return;
+ 
+ 	switch (type)
+@@ -855,6 +873,11 @@ void handleScreenEvent(_THIS, bps_event_t *event)
+ 		case SCREEN_EVENT_KEYBOARD:
+ 			handleKeyboardEvent(se);
+ 			break;
++#ifdef RAW_KEYBOARD_EVENTS
++		case SCREEN_EVENT_JOYSTICK:
++			handleTrackpadEvent(se);
++			break;
++#endif
+ 		case SCREEN_EVENT_MTOUCH_TOUCH:
+ 		case SCREEN_EVENT_MTOUCH_MOVE:
+ 		case SCREEN_EVENT_MTOUCH_RELEASE:
