@@ -270,6 +270,13 @@ void clear_all_char_tabstops(){
     clear_char_tabstops_on_row(i);
   }
 }
+/* restore the default every-8-columns tab stops (RIS semantics) */
+void reset_all_char_tabstops(){
+  int i;
+  for(i=1; i<=rows; ++i) {
+    buf_init_tabstops(tabs[i]);
+  }
+}
 
 /* text selection (copy mode). Coordinates are buffer-absolute so the
  * selection stays glued to its content while output scrolls. */

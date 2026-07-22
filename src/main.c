@@ -183,6 +183,16 @@ int send_metamode_keystrokes(const char* keystrokes){
 	return 0;
 }
 
+/* honor an active shift on keys bound to Tab: send back-tab (CSI Z)
+ * instead, consuming the sticky shift if it was armed */
+static const char* shifted_keystrokes(const char* keys, int shifted){
+	if(shifted && keys != NULL && keys[0] == '\t' && keys[1] == '\0'){
+		vmodifiers &= ~KEYMOD_SHIFT;
+		return "\x1b[Z";
+	}
+	return keys;
+}
+
 int get_virtualkeyboard_height(){
 	int rc, vkb_h;
 	rc = virtualkeyboard_get_height(&vkb_h);
@@ -904,7 +914,22 @@ void handleKeyboardEvent(screen_event_t screen_event)
 		}
 
 		if(metamode && !metamode_just_set){
-			keys = keystroke_lookup((char)screen_val, prefs->metamode_keys);
+			/* metamode is shift-aware: with Shift held (or armed via the
+			 * sticky shift key), an uppercase binding wins if one exists,
+			 * and a key bound to Tab sends back-tab (CSI Z) instead */
+			int mm_shifted = (modifiers & KEYMOD_SHIFT) || (vmodifiers & KEYMOD_SHIFT)
+			                 || (screen_val >= 'A' && screen_val <= 'Z');
+			int mm_sym = (screen_val >= 'A' && screen_val <= 'Z') ? screen_val + 040 : screen_val;
+			keys = NULL;
+			if(mm_shifted && mm_sym >= 'a' && mm_sym <= 'z'){
+				keys = keystroke_lookup((char)(mm_sym - 040), prefs->metamode_keys);
+				if(keys != NULL){
+					vmodifiers &= ~KEYMOD_SHIFT;
+				}
+			}
+			if(keys == NULL){
+				keys = shifted_keystrokes(keystroke_lookup((char)mm_sym, prefs->metamode_keys), mm_shifted);
+			}
 			if(keys != NULL){
 				send_metamode_keystrokes(keys);
 				metamode_toggle();
@@ -926,7 +951,8 @@ void handleKeyboardEvent(screen_event_t screen_event)
 		/* handle alt keys: altsym_lock is one-shot, altsym_hold stays on
 		 * until the menu key is pressed again */
 		if (altsym_lock || altsym_hold) {
-			keys = keystroke_lookup((char)screen_val, prefs->altsym_entries);
+			keys = shifted_keystrokes(keystroke_lookup((char)screen_val, prefs->altsym_entries),
+			                          (modifiers & KEYMOD_SHIFT) || (vmodifiers & KEYMOD_SHIFT));
 			if (altsym_lock) {
 				altsym_toggle();
 			}
@@ -938,7 +964,8 @@ void handleKeyboardEvent(screen_event_t screen_event)
 
 		/* handle sym keys */
 		if (current_symmenu != NULL) {
-			keys = keystroke_lookup((char)screen_val, current_symmenu->entries);
+			keys = shifted_keystrokes(keystroke_lookup((char)screen_val, current_symmenu->entries),
+			                          (modifiers & KEYMOD_SHIFT) || (vmodifiers & KEYMOD_SHIFT));
 			if (keys != NULL){
 				send_metamode_keystrokes(keys);
 				symmenu_toggle(NULL);

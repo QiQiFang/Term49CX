@@ -1,5 +1,6 @@
 *.bar
 Device-Debug
+terminfo-stage.tar
 src/*.o
 signing/bbpass
 signing/*.csk

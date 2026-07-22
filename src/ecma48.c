@@ -466,7 +466,12 @@ int ecma48_parse_control_codes(int sym, int mod, UChar* tbuf){
   // Start by checking arrow keys and stuff
   switch (sym){
   	case KEYCODE_BACKSPACE:		tbuf[0] = 010; break;
-  	case KEYCODE_TAB:					tbuf[0] = 011; break;
+  	case KEYCODE_TAB:
+  		/* Shift+Tab sends back-tab (CSI Z) */
+  		if((mod & KEYMOD_SHIFT) || (mod & KEYMOD_SHIFT_LOCK)){
+  			return ecma48_CSI_KEY(tbuf, 0132);
+  		}
+  		tbuf[0] = 011; break;
   	case KEYCODE_ESCAPE:			tbuf[0] = 033; break;
     case KEYCODE_UP:          return ecma48_NORM_APP(tbuf, 0101); break;
     case KEYCODE_DOWN:        return ecma48_NORM_APP(tbuf, 0102); break;
@@ -1642,7 +1647,9 @@ void ecma48_RIS(){
   ecma48_PRINT_CONTROL_SEQUENCE("RIS");
   ecma48_resetModes();
   buf_reset_text_buffer(buf);
-  clear_all_char_tabstops();
+  /* xterm RIS restores the default every-8 tab stops, it does not
+   * leave the screen with none at all */
+  reset_all_char_tabstops();
   buf_clear_all_vtabs();
   sr.top = 1;
   sr.bottom = rows;

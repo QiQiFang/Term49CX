@@ -38,6 +38,19 @@ the prebuilt `external/lib/libSDL12.so`).
   swipe-down-from-bezel gesture does the same.
 * Send and End keep their system behaviour.
 
+## Shift+Tab (back-tab)
+
+Key tables are shift-aware. With Shift active — held down, or armed via
+the sticky shift key (`↑` indicator) — any metamode, sym-menu, or alt
+key bound to Tab sends back-tab (`ESC [ Z`) instead, i.e. Shift+Tab.
+So: tap Shift, arm metamode (double-tap right Shift, hold Space, or tap
+the top-left corner), then `t` (the default Tab binding) — or tap
+Shift, then pick Tab from your sym menu.
+
+For custom shifted bindings, an uppercase entry in `metamode_keys` wins
+when Shift is active, e.g. `("T", "...")` alongside `("t", "\x09")`.
+Shift+Tab from the virtual keyboard also sends back-tab.
+
 ## Mouse support
 
 Term49 implements xterm mouse reporting (DECSET 9/1000/1002/1003, plus

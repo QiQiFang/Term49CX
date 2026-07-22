@@ -100,6 +100,7 @@ void buf_clear_all_vtabs();
 void clear_char_tabstop_at(int row, int col);
 void clear_char_tabstops_on_row(int row);
 void clear_all_char_tabstops();
+void reset_all_char_tabstops();
 void buf_clear_all_renders();
 void buf_reset_text_buffer(buf_t* toclear);
 

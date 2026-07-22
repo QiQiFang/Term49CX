@@ -38,7 +38,13 @@ STAGE=/tmp/bar-stage
 rm -rf "$STAGE" && mkdir -p "$STAGE"
 cp -r bar-descriptor.xml icons external Device-Debug share "$STAGE"/
 rm -rf "$STAGE/share/terminfo"
-git archive HEAD share/terminfo | (cd "$STAGE" && tar -xf -)
+# prefer the tar pre-staged by docker-build.sh on the host; git may not
+# work in here (subdirectory checkout, or a git too old for the repo)
+if [ -f /work/terminfo-stage.tar ]; then
+	(cd "$STAGE" && tar -xf /work/terminfo-stage.tar)
+else
+	git archive HEAD share/terminfo | (cd "$STAGE" && tar -xf -)
+fi
 # the packager exits non-zero over the placeholder authorId but still
 # writes the bar; tolerate that and check for the file instead.
 # Note: no -devMode here - it stamps Development-Mode into the manifest,
