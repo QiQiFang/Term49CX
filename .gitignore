@@ -7,3 +7,18 @@ signing/*.csk
 signing/*.bar
 signing/*.p12
 signing/ssh-key*
+
+# Vendored/build binaries — kept locally, purged from git history to slim the
+# repo (history rewrite also dropped DropboxBB10/ and all *.bar/*.symbols.elf).
+# Re-vendor these on a fresh clone; they are intentionally not tracked.
+*.so
+*.a
+*.o
+*.ttf
+/share/root/bin/mksh
+/share/root/bin/scp
+/share/root/bin/sftp
+/share/root/bin/ssh
+/share/root/bin/ssh-keygen
+/share/root/libexec/scp
+/share/root/libexec/sftp
