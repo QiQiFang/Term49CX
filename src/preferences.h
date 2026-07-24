@@ -38,11 +38,11 @@
 
 static int PREFS_VERSION = 9;
 
-#define DEFAULT_FONT_PATH "/usr/fonts/font_repository/monotype/andalemo.ttf"
+#define DEFAULT_FONT_PATH "/usr/fonts/font_repository/dejavu/DejaVuSansMono.ttf"
 /* bundled fallback for glyphs missing from the main font
  * (box drawing, braille, powerline, ...) */
 #define DEFAULT_FALLBACK_FONT_PATH "../app/native/fonts/CascadiaMonoPL-Regular.ttf"
-#define DEFAULT_FONT_SIZE 24//40
+#define DEFAULT_FONT_SIZE 20
 #define DEFAULT_TEXT_COLOR (int[]){255, 255, 255}
 #define DEFAULT_BACKGROUND_COLOR (int[]){0, 0, 0}
 #define DEFAULT_SCREEN_IDLE_AWAKE 0
@@ -66,13 +66,14 @@ static int PREFS_VERSION = 9;
                                                 {'c', "ctrl_down"}, \
                                                 {'s', "rescreen"}, \
                                                 {'v', "paste_clipboard"}}
-#define DEFAULT_SYMMENU_NUM_ROWS 2
-#define DEFAULT_SYMMENU_ROW_LENS (int[]){10, 9}
+#define DEFAULT_SYMMENU_NUM_ROWS 3
+#define DEFAULT_SYMMENU_ROW_LENS (int[]){10, 9, 9}
 #define DEFAULT_SYMMENU_ENTRIES (keymap_t[]) {  \
-    {'q', "~"}, {'w', "`"}, {'e', "{"}, {'r', "}"}, {'t', "["}, {'y', "]"}, {'u', "<"}, {'i', ">"}, {'o', "^"}, {'p', "%"}, \
-    {'a', "="}, {'s', "-"}, {'d', "*"}, {'f', "/"}, {'g', "\\"},{'h', "|"}, {'j', "&"}, {'k', "'"}, {'l', "\""} \
+    {'q', "\x1b"}, {'w', "1"}, {'e', "2"}, {'r', "3"}, {'t', "\x09"}, {'y', "<"}, {'u', ">"}, {'i', "\x03"}, {'o', "^"}, {'p', "%"}, \
+    {'a', "~"}, {'s', "4"}, {'d', "5"}, {'f', "6"}, {'g', "\\"}, {'h', "|"}, {'j', "&"}, {'k', "`"}, {'l', "="}, \
+    {'0', "0"}, {'z', "7"}, {'x', "8"}, {'c', "9"}, {'v', "{"}, {'b', "}"}, {'n', "["}, {'m', "]"}, {'$', "\x1b[A"} \
 }
-#define DEFAULT_STICKY_SYM_KEY 0
+#define DEFAULT_STICKY_SYM_KEY 1
 #define DEFAULT_STICKY_SHIFT_KEY 1
 #define DEFAULT_STICKY_ALT_KEY 1
 #define DEFAULT_KEYHOLD_ACTIONS_EXEMPT_LEN 2
