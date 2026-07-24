@@ -45,6 +45,26 @@ if [ -f /work/terminfo-stage.tar ]; then
 else
 	git archive HEAD share/terminfo | (cd "$STAGE" && tar -xf -)
 fi
+# The source tree was authored on a case-insensitive (macOS) filesystem, so
+# git only ever stored ONE case per collided single-letter directory - e.g.
+# xterm-256color lives under X/ and there is no x/ at all. The device is
+# case-sensitive and ncurses looks up terminfo by the literal first byte of
+# $TERM, so x/xterm-256color is never found -> $TERM fails to load and the
+# shell can no longer move the cursor (backspace leaves stray spaces). Mirror
+# every single-letter directory to its opposite-case sibling so both resolve.
+TIDIR="$STAGE/share/terminfo"
+for d in "$TIDIR"/?; do
+	[ -d "$d" ] || continue
+	b="$(basename "$d")"
+	case "$b" in
+		[A-Za-z]) ;;
+		*) continue ;;
+	esac
+	alt="$(printf '%s' "$b" | tr 'A-Za-z' 'a-zA-Z')"
+	[ "$alt" = "$b" ] && continue
+	mkdir -p "$TIDIR/$alt"
+	cp -n "$d"/* "$TIDIR/$alt"/ 2>/dev/null || true
+done
 # the packager exits non-zero over the placeholder authorId but still
 # writes the bar; tolerate that and check for the file instead.
 # Note: no -devMode here - it stamps Development-Mode into the manifest,
