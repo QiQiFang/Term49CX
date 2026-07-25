@@ -70,6 +70,13 @@ static int vmodifiers = 0;
 
 static TTF_Font* font;
 static TTF_Font* fallback_font;
+/* Chain of CJK faces tried in order for glyphs the fonts above lack. No single
+ * BB10 face covers all of CJK: the Simplified Hei (GB18030) has Han but not
+ * Japanese kana or Hangul, so extra faces are chained (MSung/cp950 for kana,
+ * malgun for Hangul) — matching bb10-remote's resolved fallback order. */
+#define MAX_CJK_FONTS 4
+static TTF_Font* cjk_fonts[MAX_CJK_FONTS];
+static int num_cjk_fonts;
 static int text_width;
 static int text_height;
 static int text_height_padding;
@@ -444,19 +451,65 @@ int font_init(int font_size){
 		}
 	}
 
+	/* CJK fonts for Han/kana/hangul glyphs the fonts above lack. These are
+	 * full-width by nature, so they are loaded at the normal size (no
+	 * cell-width shrinking); double-width layout is handled by the terminal
+	 * core. The primary comes from prefs (a Simplified Chinese Hei face that
+	 * covers Han); the fallbacks below add the scripts it lacks (MSung/cp950
+	 * carries Japanese kana, malgun carries Hangul). */
+	num_cjk_fonts = 0;
+	{
+		int i;
+		const char* paths[MAX_CJK_FONTS];
+		int n = 0;
+		if(prefs->cjk_font_path && prefs->cjk_font_path[0]){
+			paths[n++] = prefs->cjk_font_path;
+		}
+		paths[n++] = "/usr/fonts/font_repository/monotype/MSungM.cp950.v311.1.ttf";
+		paths[n++] = "/usr/fonts/font_repository/monotype/malgun.ttf";
+		for(i = 0; i < n && num_cjk_fonts < MAX_CJK_FONTS; ++i){
+			TTF_Font* f = TTF_OpenFont(paths[i], font_size);
+			if(f == NULL){
+				fprintf(stderr, "No CJK font at %s: %s\n", paths[i], SDL_GetError());
+				continue;
+			}
+			TTF_SetFontStyle(f, TTF_STYLE_NORMAL);
+			TTF_SetFontOutline(f, 0);
+			TTF_SetFontKerning(f, 0);
+			TTF_SetFontHinting(f, TTF_HINTING_NORMAL);
+			PRINT(stderr, "CJK font %s at size %d\n", paths[i], font_size);
+			cjk_fonts[num_cjk_fonts++] = f;
+		}
+	}
+
 	return TERM_SUCCESS;
 }
 
 /* pick the font that can actually draw this character */
 static TTF_Font* font_for_char(UChar c){
-	if(fallback_font == NULL || TTF_GlyphIsProvided(font, c)){
+	if(TTF_GlyphIsProvided(font, c)){
 		return font;
 	}
-	return TTF_GlyphIsProvided(fallback_font, c) ? fallback_font : font;
+	if(fallback_font != NULL && TTF_GlyphIsProvided(fallback_font, c)){
+		return fallback_font;
+	}
+	int i;
+	for(i = 0; i < num_cjk_fonts; ++i){
+		if(TTF_GlyphIsProvided(cjk_fonts[i], c)){
+			return cjk_fonts[i];
+		}
+	}
+	return font;
 }
 
 void font_uninit(){
 
+	int i;
+	for(i = 0; i < num_cjk_fonts; ++i){
+		TTF_CloseFont(cjk_fonts[i]);
+		cjk_fonts[i] = NULL;
+	}
+	num_cjk_fonts = 0;
 	if(fallback_font != NULL){
 		TTF_CloseFont(fallback_font);
 		fallback_font = NULL;
@@ -1337,6 +1390,11 @@ static UChar* selection_to_text(int* out_len){
 			}
 		}
 		for(int col = start; col <= last && col < cols; ++col){
+			/* skip the trailing half of a double-width char; its glyph was
+			 * already emitted from the lead cell */
+			if(buf->text[row][col].wide == 2){
+				continue;
+			}
 			UChar c = buf->text[row][col].c;
 			text[n++] = (c == 0) ? ' ' : c;
 		}
@@ -1372,6 +1430,16 @@ void render() {
 			/* guard against screen rotations that push the bottom of the screen past the
 			 * bottom of the buffer. */
 			sc = (bufline >= 0 && bufline < TEXT_BUFFER_SIZE) ? &buf->text[bufline][j] : &blank_sc;
+			/* trailing cell of a double-width char: the lead glyph already
+			 * painted this column, so leave it and keep the columns aligned */
+			if(sc->wide == 2){
+				if(buf_sel_contains(bufline, j)){
+					SDL_Rect selrect = {x, y, advance, text_height};
+					invert_rect(&selrect);
+				}
+				x += advance;
+				continue;
+			}
 			if((sc->surface == NULL) && (sc->c != 0)){
 				// we have added a new char, but not rendered it yet
 				str[0] = sc->c;

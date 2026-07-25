@@ -355,6 +355,7 @@ static hitbox_t* create_hitbox(config_t const *config, char const *path, hitbox_
 void destroy_preferences(pref_t *pref) {
 	free(pref->font_path);
 	free(pref->fallback_font_path);
+	free(pref->cjk_font_path);
 	free(pref->tty_encoding);
 	free(pref->trackpad_click_keys);
 	free(pref->back_button_keys);
@@ -419,6 +420,8 @@ pref_t *read_preferences(const char* filename) {
 	prefs->font_path = strdup(prefs->font_path);
 	DEFAULT_LOOKUP(string, config, "fallback_font_path", prefs->fallback_font_path, DEFAULT_FALLBACK_FONT_PATH);
 	prefs->fallback_font_path = strdup(prefs->fallback_font_path);
+	DEFAULT_LOOKUP(string, config, "cjk_font_path", prefs->cjk_font_path, DEFAULT_CJK_FONT_PATH);
+	prefs->cjk_font_path = strdup(prefs->cjk_font_path);
 	DEFAULT_LOOKUP(int, config, "font_size", prefs->font_size, DEFAULT_FONT_SIZE);
 	prefs->text_color = create_int_array(config, "text_color", PREFS_COLOR_NUM_ELEMENTS, DEFAULT_TEXT_COLOR, 0);
 	prefs->background_color = create_int_array(config, "background_color", PREFS_COLOR_NUM_ELEMENTS, DEFAULT_BACKGROUND_COLOR, 0);
@@ -538,6 +541,7 @@ void save_preferences(pref_t const* prefs, char const* filename) {
 
 	PREF_SET(root, setting, "font_path", string, STRING, prefs->font_path);
 	PREF_SET(root, setting, "fallback_font_path", string, STRING, prefs->fallback_font_path);
+	PREF_SET(root, setting, "cjk_font_path", string, STRING, prefs->cjk_font_path);
 	PREF_SET(root, setting, "font_size", int, INT, prefs->font_size);
 	set_int_array(root, "text_color", PREFS_COLOR_NUM_ELEMENTS, prefs->text_color);
 	set_int_array(root, "background_color", PREFS_COLOR_NUM_ELEMENTS, prefs->background_color);

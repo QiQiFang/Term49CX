@@ -30,6 +30,8 @@ typedef struct _pref_t {
 	char *font_path;
 	/* used for glyphs the main font does not provide */
 	char *fallback_font_path;
+	/* used for CJK (Han/kana/hangul) glyphs the fonts above lack */
+	char *cjk_font_path;
 	int font_size, *text_color, *background_color, screen_idle_awake,
 		auto_show_vkb, metamode_doubletap_key, metamode_doubletap_delay,
 		keyhold_actions, metamode_hold_key, allow_resize_columns;

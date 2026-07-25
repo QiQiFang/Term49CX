@@ -32,6 +32,9 @@ struct screenchar {
   UChar c;
   struct font_style style;
   SDL_Surface* surface;
+  /* 0 = single-width, 1 = lead cell of a double-width (CJK) char whose
+   * glyph spans this cell and the next, 2 = the trailing continuation cell */
+  char wide;
 };
 
 struct text {

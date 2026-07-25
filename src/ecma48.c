@@ -16,6 +16,7 @@
 
 #include <sys/keycodes.h>
 #include <unicode/utf.h>
+#include <unicode/uchar.h>
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
@@ -267,6 +268,16 @@ void ecma48_end_control(){
 	ecma48_escape_args_init();
 }
 
+/* display columns a character occupies: 2 for East-Asian wide/fullwidth
+ * (CJK), 1 otherwise. */
+static int ecma48_char_width(UChar c){
+  if(c < 0x1100){ /* fast path: Latin, punctuation, controls */
+    return 1;
+  }
+  int ea = u_getIntPropertyValue((UChar32)c, UCHAR_EAST_ASIAN_WIDTH);
+  return (ea == U_EA_WIDE || ea == U_EA_FULLWIDTH) ? 2 : 1;
+}
+
 void ecma48_add_char(UChar c){
 
   /* apply the active SCS charset (DEC Special Graphics line drawing) */
@@ -275,34 +286,48 @@ void ecma48_add_char(UChar c){
   }
 
   if(writing_buffer == BUFFER_NORMAL){
+    int cw = ecma48_char_width(c);
     // check if we are being asked to write beyond the screen
-    // if so, the program is not handling wrapping, so we wrap
-  	if(buf->col == cols) {
+    // if so, the program is not handling wrapping, so we wrap. A
+    // double-width char also wraps when only one column is left.
+  	if(buf->col + cw > cols) {
 			if(autowrap){ // wrap
 				buf_increment_line();
 				buf->col = 0;
 			} else { // no autowrap means no wrapping
-				// overwrite last char
-				buf->col = cols -1;
+				// overwrite last char(s)
+				buf->col = cols - cw;
+				if(buf->col < 0){ buf->col = 0; }
 			}
 		}
   	if(modes.IRM){
-  	  /* INSERT Mode - insert a blank before doing the usual thing */
+  	  /* INSERT Mode - insert blank(s) before doing the usual thing */
   	  buf_insert_character(0);
+  	  if(cw == 2){ buf_insert_character(0); }
   	}
-    struct screenchar *sc = &(buf->text[buf->line][buf->col++]);
+    struct screenchar *sc = &(buf->text[buf->line][buf->col]);
 
     /* free old char */
     buf_free_char(sc);
     /* write new one */
     sc->c = c;
     sc->style = buf->current_style;
+    sc->wide = (cw == 2) ? 1 : 0;
     if(buf->current_style.reverse){
       /* reverse the fg and bg */
       SDL_Color temp = sc->style.fg_color;
       sc->style.fg_color = sc->style.bg_color;
       sc->style.bg_color = temp;
     }
+    if(cw == 2 && buf->col + 1 < cols){
+      /* the trailing cell is a continuation the lead glyph paints over */
+      struct screenchar *cont = &(buf->text[buf->line][buf->col + 1]);
+      buf_free_char(cont);
+      cont->c = 0;
+      cont->style = sc->style;
+      cont->wide = 2;
+    }
+    buf->col += cw;
     /* cache for REP */
     last_char = c;
   } else if(writing_buffer == BUFFER_OSC){

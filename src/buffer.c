@@ -190,6 +190,7 @@ void buf_erase_line(struct screenchar* sc, size_t n){
     buf_free_char(&sc[i]);
     sc[i].c = ' ';
     sc[i].style = buf->current_style;
+    sc[i].wide = 0;
   }
 }
 

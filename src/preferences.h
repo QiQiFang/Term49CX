@@ -42,6 +42,9 @@ static int PREFS_VERSION = 9;
 /* bundled fallback for glyphs missing from the main font
  * (box drawing, braille, powerline, ...) */
 #define DEFAULT_FALLBACK_FONT_PATH "../app/native/fonts/CascadiaMonoPL-Regular.ttf"
+/* on-device font that covers CJK (Han + kana); Simplified Chinese Hei,
+ * whose Han glyphs also serve Japanese kanji */
+#define DEFAULT_CJK_FONT_PATH "/usr/fonts/font_repository/monotype/MHeiM.GB18030_200910.ttf"
 #define DEFAULT_FONT_SIZE 20
 #define DEFAULT_TEXT_COLOR (int[]){255, 255, 255}
 #define DEFAULT_BACKGROUND_COLOR (int[]){0, 0, 0}
