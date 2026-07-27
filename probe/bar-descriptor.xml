@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<qnx xmlns="http://www.qnx.com/schemas/application/1.0">
+    <id>com.term49.TouchProbe</id>
+    <name>TouchProbe</name>
+    <versionNumber>1.0.0</versionNumber>
+    <buildId>1</buildId>
+    <description>Logs Screen MTOUCH/keyboard events for Passport keyboard research</description>
+
+    <!-- Match your debug token / signing author (same as Term49 if needed). -->
+    <author>Package-Author</author>
+    <authorId>Package-Author-Id</authorId>
+
+    <configuration name="Device-Debug">
+        <platformArchitecture>armle-v7</platformArchitecture>
+        <asset path="Device-Debug/TouchProbe" entry="true" type="Qnx/Elf">TouchProbe</asset>
+    </configuration>
+    <configuration name="Device-Release">
+        <platformArchitecture>armle-v7</platformArchitecture>
+        <asset path="Device-Release/TouchProbe" entry="true" type="Qnx/Elf">TouchProbe</asset>
+    </configuration>
+
+    <initialWindow>
+        <autoOrients>true</autoOrients>
+        <systemChrome>none</systemChrome>
+        <transparent>false</transparent>
+    </initialWindow>
+
+    <permission system="true">run_native</permission>
+    <permission>access_shared</permission>
+    <permission>read_device_identifying_information</permission>
+
+    <env var="LD_LIBRARY_PATH" value="app/native/lib"/>
+</qnx>
