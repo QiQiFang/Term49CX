@@ -1,9 +1,9 @@
 /*
- * TouchProbe v6 — Passport capacitive keyboard soft-touch.
+ * TouchProbe v6 - Passport capacitive keyboard soft-touch.
  *
  * Community/SDL note: soft-touch may arrive as SCREEN_EVENT_POINTER (not MTOUCH).
  * SDL_playbookevents handlePointerEvent() DROPS events when SOURCE_POSITION.y < 0
- * ("Detected pointer swipe event") — exactly the off-LCD / keyboard region.
+ * ("Detected pointer swipe event") - exactly the off-LCD / keyboard region.
  *
  * v6:
  *   - Full POINTER logging (pos/src/buttons/disp/device/product/role)
@@ -64,7 +64,7 @@ static screen_window_t g_win;
 static screen_buffer_t g_buf;
 static screen_session_t g_lcd_session;
 static screen_session_t g_ckb_session;   /* MTOUCH CKB session */
-static screen_session_t g_ptr_session;   /* POINTER session — hypothesis: CKB as POINTER */
+static screen_session_t g_ptr_session;   /* POINTER session - hypothesis: CKB as POINTER */
 static screen_session_t g_key_session;
 static int g_ptr_count; /* POINTER events seen */
 static screen_event_t g_ev;
@@ -336,13 +336,13 @@ static void try_bind_ckb(void)
 	if (g_ckb_dev) {
 		p = g_win;
 		rc = screen_set_device_property_pv(g_ckb_dev, SCREEN_PROPERTY_WINDOW, &p);
-		log_line("CKB device→WINDOW: %s\n", rc == 0 ? "ok" : strerror(errno));
+		log_line("CKB device->WINDOW: %s\n", rc == 0 ? "ok" : strerror(errno));
 		p = g_ckb_session;
 		rc = screen_set_device_property_pv(g_ckb_dev, SCREEN_PROPERTY_SESSION, &p);
-		log_line("CKB device→SESSION: %s\n", rc == 0 ? "ok" : strerror(errno));
+		log_line("CKB device->SESSION: %s\n", rc == 0 ? "ok" : strerror(errno));
 		p = g_ckb_dev;
 		rc = screen_set_session_property_pv(g_ckb_session, SCREEN_PROPERTY_DEVICES, &p);
-		log_line("CKB session→DEVICES: %s\n", rc == 0 ? "ok" : strerror(errno));
+		log_line("CKB session->DEVICES: %s\n", rc == 0 ? "ok" : strerror(errno));
 	} else {
 		log_line("CKB bind: no touch_keypad device\n");
 	}
@@ -431,7 +431,7 @@ static void process_screen_event(screen_event_t se, const char *via)
 
 		role = role_for_device(device);
 		out = (pos[0] < 0 || pos[1] < 0 || pos[0] >= g_size[0] || pos[1] >= g_size[1]);
-		/* Prefer device role; if unknown and outside LCD or from ckb_dev → CKB */
+		/* Prefer device role; if unknown and outside LCD or from ckb_dev -> CKB */
 		if (role == DEV_ROLE_CKB || device == g_ckb_dev)
 			cls = CLASS_CKB;
 		else if (role == DEV_ROLE_LCD || device == g_lcd_dev)
@@ -592,7 +592,7 @@ static int setup_sessions(void)
 		log_line("CKB session ok %p\n", (void *)g_ckb_session);
 	}
 
-	/* POINTER session — community notes claim Passport CKB arrives as POINTER */
+	/* POINTER session - community notes claim Passport CKB arrives as POINTER */
 	rc = screen_create_session_type(&g_ptr_session, g_ctx, SCREEN_EVENT_POINTER);
 	if (rc) {
 		log_line("POINTER session FAIL %s\n", strerror(errno));
@@ -738,7 +738,7 @@ int main(int argc, char **argv)
 	virtualkeyboard_show();
 	log_line("virtualkeyboard_show() called\n");
 	log_line("NOTE: SDL drops POINTER when SOURCE_POSITION.y < 0 "
-	         "(see handlePointerEvent) — we log those anyway\n");
+	         "(see handlePointerEvent) - we log those anyway\n");
 
 	draw_hud();
 

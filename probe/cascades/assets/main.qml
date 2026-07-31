@@ -15,7 +15,7 @@ Page {
 
         Label {
             id: status
-            text: "Cascades CKB probe\nSoft-swipe keyboard → magenta + log\nDocuments/TouchProbeCascades.log\n\nTap screen to focus"
+            text: "Cascades CKB probe\nSoft-swipe keyboard -> magenta + log\nDocuments/TouchProbeCascades.log\n\nTap screen to focus"
             textStyle.color: Color.White
             textStyle.fontSize: FontSize.Large
             textStyle.textAlign: TextAlign.Center
@@ -39,7 +39,7 @@ Page {
                                    + " id=" + event.fingerId
                     } else if (event.touchType == TouchType.Up) {
                         root.background = Color.Black
-                        status.text = "CKB Up — check log file"
+                        status.text = "CKB Up - check log file"
                     }
                 }
             }

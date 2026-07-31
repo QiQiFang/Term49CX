@@ -16,6 +16,7 @@
 
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
 #include <unicode/utf.h>
 #include <unicode/ucnv.h>
 #include <unicode/ustring.h>
@@ -109,6 +110,43 @@ int32_t io_upcase_last_write(UChar **buf, int32_t nUChar){
 	return 0;
 }
 
+/* The master pty is O_NONBLOCK, so a write can come up short - or fail
+ * outright with EAGAIN - whenever the child is not draining its end fast
+ * enough. Ignoring that loses the tail of a key sequence (an arrow key
+ * arriving as a bare ESC) or most of a paste, which reads as a dead
+ * keyboard. Retry until the buffer is gone, with a bound so a child that
+ * has stopped reading for good cannot wedge the caller: this runs on the
+ * UI thread with the input lock held. */
+#define WRITE_RETRY_USEC  1000
+#define WRITE_RETRY_LIMIT 200   /* ~200ms */
+static ssize_t write_all_master(const char* buf, size_t len){
+  size_t off = 0;
+  int tries = 0;
+  while(off < len){
+    ssize_t w = write(master_fd, buf + off, len - off);
+    if(w > 0){
+      off += (size_t)w;
+      tries = 0;
+      continue;
+    }
+    if(w < 0 && (errno == EAGAIN || errno == EINTR)){
+      if(++tries > WRITE_RETRY_LIMIT){
+        fprintf(stderr, "Gave up writing %d of %d bytes to the pty\n",
+                (int)(len - off), (int)len);
+        break;
+      }
+      usleep(WRITE_RETRY_USEC);
+      continue;
+    }
+    /* a real error */
+    if(off == 0){
+      return w;
+    }
+    break;
+  }
+  return (ssize_t)off;
+}
+
 ssize_t io_write_master(const UChar *buf, size_t nUChar){
 
 	char* target = writebuf;
@@ -124,11 +162,11 @@ ssize_t io_write_master(const UChar *buf, size_t nUChar){
   }
 
   writebufLimit = target;
-	return write(master_fd, writebuf, (size_t)(target - writebuf));
+	return write_all_master(writebuf, (size_t)(target - writebuf));
 }
 
 ssize_t io_write_master_char(const char *buf, size_t n){
-  return write(master_fd, buf, n);
+  return write_all_master(buf, n);
 }
 
 ssize_t io_read_master(UChar *buf, size_t nUChar){
@@ -197,11 +235,11 @@ void io_paste_from_clipboard(){
       if(ecma48_bracketed_paste()){
         /* xterm bracketed paste: let the application distinguish pasted
          * text from typed text */
-        write(master_fd, "\033[200~", 6);
-        write(master_fd, buffer, ret * sizeof(char));
-        write(master_fd, "\033[201~", 6);
+        write_all_master("\033[200~", 6);
+        write_all_master(buffer, ret * sizeof(char));
+        write_all_master("\033[201~", 6);
       } else {
-        write(master_fd, buffer, ret * sizeof(char));
+        write_all_master(buffer, ret * sizeof(char));
       }
       free(buffer);
     }

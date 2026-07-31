@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <sched.h>
 #include <sys/select.h>
 
 #include <bps/screen.h>
@@ -73,7 +74,7 @@ static TTF_Font* fallback_font;
 /* Chain of CJK faces tried in order for glyphs the fonts above lack. No single
  * BB10 face covers all of CJK: the Simplified Hei (GB18030) has Han but not
  * Japanese kana or Hangul, so extra faces are chained (MSung/cp950 for kana,
- * malgun for Hangul) — matching bb10-remote's resolved fallback order. */
+ * malgun for Hangul) - matching bb10-remote's resolved fallback order. */
 #define MAX_CJK_FONTS 4
 static TTF_Font* cjk_fonts[MAX_CJK_FONTS];
 static int num_cjk_fonts;
@@ -502,9 +503,101 @@ static TTF_Font* font_for_char(UChar c){
 	return font;
 }
 
+/* Glyph cache.
+ *
+ * Rendering a glyph means a FreeType rasterisation plus a surface
+ * allocation, and it happens with the input lock held - the SDL event pump
+ * needs that same lock before it can deliver a keystroke. Rendering every
+ * cell of a full-screen repaint separately (the same 'e' dozens of times)
+ * therefore shows up directly as input latency, seconds of it when a tmux
+ * pane repaints continuously.
+ *
+ * So glyphs are rasterised once per (character, style, colours) and shared
+ * by every cell that draws them. Cells hold *borrowed* pointers: entries
+ * are never freed individually, only wholesale by glyph_cache_flush(),
+ * which font_uninit() calls before any font or size change. Every caller
+ * of font_uninit() follows it with buf_clear_all_renders(), which nulls the
+ * cell pointers, and neither releases the input lock in between. */
+#define GLYPH_CACHE_SLOTS 4096  /* power of two, far more than one screen */
+#define GLYPH_CACHE_PROBES 8
+
+struct glyph_entry {
+	SDL_Surface* surface;
+	UChar c;
+	int style;
+	Uint32 fg, bg;
+	char used;
+};
+static struct glyph_entry glyph_cache[GLYPH_CACHE_SLOTS];
+
+static Uint32 pack_color(SDL_Color c){
+	return ((Uint32)c.r << 16) | ((Uint32)c.g << 8) | (Uint32)c.b;
+}
+
+void glyph_cache_flush(){
+	int i;
+	for(i = 0; i < GLYPH_CACHE_SLOTS; ++i){
+		if(glyph_cache[i].used){
+			SDL_FreeSurface(glyph_cache[i].surface);
+			glyph_cache[i].surface = NULL;
+			glyph_cache[i].used = 0;
+		}
+	}
+}
+
+/* Shaded glyph for this character in this style and these colours.
+ * *shared is 1 when the surface belongs to the cache - borrow it, never
+ * free it. It is 0 only when the bucket is full, in which case the caller
+ * owns the returned surface and must free it after drawing. */
+static SDL_Surface* glyph_render(UChar c, int style, SDL_Color fg, SDL_Color bg, int* shared){
+	UChar str[2] = {c, 0};
+	Uint32 pfg = pack_color(fg);
+	Uint32 pbg = pack_color(bg);
+	Uint32 h = ((Uint32)c * 2654435761u) ^ ((Uint32)style * 40503u)
+	           ^ (pfg * 2246822519u) ^ (pbg * 3266489917u);
+	int slot = (int)(h & (GLYPH_CACHE_SLOTS - 1));
+	int probe;
+	TTF_Font* rfont;
+
+	for(probe = 0; probe < GLYPH_CACHE_PROBES; ++probe){
+		struct glyph_entry* e = &glyph_cache[(slot + probe) & (GLYPH_CACHE_SLOTS - 1)];
+		if(e->used){
+			if(e->c == c && e->style == style && e->fg == pfg && e->bg == pbg){
+				*shared = 1;
+				return e->surface;
+			}
+			continue;
+		}
+		/* empty slot: rasterise into it */
+		rfont = font_for_char(c);
+		TTF_SetFontStyle(rfont, style);
+		e->surface = TTF_RenderUNICODE_Shaded(rfont, str, fg, bg);
+		if(e->surface == NULL){
+			*shared = 1;
+			return NULL;
+		}
+		e->c = c;
+		e->style = style;
+		e->fg = pfg;
+		e->bg = pbg;
+		e->used = 1;
+		*shared = 1;
+		return e->surface;
+	}
+
+	/* bucket full: fall back to a one-off the caller frees */
+	rfont = font_for_char(c);
+	TTF_SetFontStyle(rfont, style);
+	*shared = 0;
+	return TTF_RenderUNICODE_Shaded(rfont, str, fg, bg);
+}
+
 void font_uninit(){
 
 	int i;
+
+	/* cells borrow from the cache, so it must go before the fonts do */
+	glyph_cache_flush();
 	for(i = 0; i < num_cjk_fonts; ++i){
 		TTF_CloseFont(cjk_fonts[i]);
 		cjk_fonts[i] = NULL;
@@ -1150,7 +1243,32 @@ void setup_screen_size(int s_w, int s_h){
 	set_tty_window_size();
 }
 
+/* Number of UI-side threads blocked on the input lock. The SDL event pump
+ * takes this lock before it can deliver a keystroke, and the render thread
+ * asks for it far more often (once to parse, once to draw, per frame), so
+ * on an unfair mutex the pump can lose the race for many frames in a row -
+ * seconds of key latency. The render thread uses lock_input_lowpri() below
+ * to stand aside while anyone is waiting. */
+static volatile int ui_lock_waiters = 0;
+
 void lock_input(){
+	++ui_lock_waiters;
+	if(SDL_LockMutex(input_mutex) == -1){
+		fprintf(stderr, "Couldn't lock input mutex - exiting\n");
+		exit_application = 1;
+	}
+	--ui_lock_waiters;
+}
+
+/* Take the input lock, but let any waiting UI thread in first. Bounded so a
+ * storm of input cannot starve drawing completely. */
+#define LOWPRI_MAX_YIELDS 64
+static void lock_input_lowpri(){
+	int yields = 0;
+	while(ui_lock_waiters > 0 && yields < LOWPRI_MAX_YIELDS){
+		sched_yield();
+		++yields;
+	}
 	if(SDL_LockMutex(input_mutex) == -1){
 		fprintf(stderr, "Couldn't lock input mutex - exiting\n");
 		exit_application = 1;
@@ -1167,7 +1285,7 @@ void indicate_event_input(){
 	char *indicate_buf = "w";
 	/* indicate that the render thread should run. Note that
 	 * we are logging errors here, but aren't doing anything with them. */
-	if(write(event_pipe[1], (void*)indicate_buf, 1) < 0){
+	if(write(event_pipe[1], (void*)indicate_buf, 1) < 0 && errno != EAGAIN){
 		fprintf(stderr, "Error writing to event pipe: %d\n", errno);
 	}
 }
@@ -1176,6 +1294,12 @@ void indicate_event_input(){
 /* This function is intended for resizing the number of
  * colums after app init */
 void set_screen_cols(int ncols){
+	/* Reloading every face and dropping every cached glyph is expensive
+	 * enough to look like a hang, and DECCOLM arrives from the wire - an
+	 * app that re-asserts the width it already has must not cost anything. */
+	if (ncols <= 0 || ncols == cols) {
+		return;
+	}
 	/* the user wants this number of columns */
 	if (prefs->allow_resize_columns) {
 		int new_fontsize = preferences_guess_best_font_size(prefs, ncols);
@@ -1202,6 +1326,13 @@ static int sdl_init() {
 		fprintf(stderr, "Couldn't create event pipe\n");
 		return TERM_FAILURE;
 	}
+	/* Neither end may block. The write end is written from the main thread
+	 * with the input lock held, so a full pipe there would deadlock the app
+	 * against the render thread; a dropped byte costs nothing because it is
+	 * only a hint that there is something new to draw. The read end is
+	 * drained in a loop, which needs the -1/EAGAIN to terminate. */
+	fcntl(event_pipe[0], F_SETFL, fcntl(event_pipe[0], F_GETFL) | O_NONBLOCK);
+	fcntl(event_pipe[1], F_SETFL, fcntl(event_pipe[1], F_GETFL) | O_NONBLOCK);
 
 	/* Initialize SDL */
 	if (SDL_Init(SDL_INIT_VIDEO) < 0 ) {
@@ -1440,21 +1571,29 @@ void render() {
 				x += advance;
 				continue;
 			}
+			/* set only when the cache was full and handed us a surface
+			 * of our own, which is freed again after the blit below */
+			SDL_Surface* oneoff = NULL;
 			if((sc->surface == NULL) && (sc->c != 0)){
 				// we have added a new char, but not rendered it yet
-				str[0] = sc->c;
-				TTF_Font *rfont = font_for_char(sc->c);
-				TTF_SetFontStyle(rfont, sc->style.style);
+				int shared = 1;
+				SDL_Surface* glyph;
 				if(buf->inverse_video){
-					sc->surface = TTF_RenderUNICODE_Shaded(rfont, str, adjust_color(sc->style.bg_color, sc->style), sc->style.fg_color);
+					glyph = glyph_render(sc->c, sc->style.style,
+					        adjust_color(sc->style.bg_color, sc->style), sc->style.fg_color, &shared);
 				} else {
-					sc->surface = TTF_RenderUNICODE_Shaded(rfont, str, adjust_color(sc->style.fg_color, sc->style), sc->style.bg_color);
+					glyph = glyph_render(sc->c, sc->style.style,
+					        adjust_color(sc->style.fg_color, sc->style), sc->style.bg_color, &shared);
 				}
-				if(sc->surface == NULL){
+				if(glyph == NULL){
 					PRINT(stderr, "Rendering failed for char %d\n", (int)sc->c);
+				} else if(shared){
+					sc->surface = glyph;   /* borrowed from the cache */
+				} else {
+					oneoff = glyph;
 				}
 			}
-			if(sc->surface == NULL || flash){
+			if((sc->surface == NULL && oneoff == NULL) || flash){
 				// no glyph here - render blank
 				if(buf->inverse_video){
 					torender = flash ? blank_surface : flash_surface;
@@ -1462,7 +1601,7 @@ void render() {
 					torender = flash ? flash_surface : blank_surface;
 				}
 			} else {
-				torender = sc->surface;
+				torender = sc->surface != NULL ? sc->surface : oneoff;
 			}
 
 			/* construct the destination rectangle */
@@ -1478,6 +1617,9 @@ void render() {
 			if(buf_sel_contains(bufline, j)){
 				SDL_Rect selrect = {x, y, advance, text_height};
 				invert_rect(&selrect);
+			}
+			if(oneoff != NULL){
+				SDL_FreeSurface(oneoff);
 			}
 			x += advance;
 		}
@@ -1769,6 +1911,20 @@ void sig_child(int signo){
 	errno = old_errno;
 }
 
+/* How many UChars of child output we parse before letting go of the input
+ * lock and drawing a frame. Without a cap, a child that keeps producing
+ * (a full-screen TUI repainting under tmux, `yes`, a large cat) keeps this
+ * thread inside the lock indefinitely: the main thread needs the same lock
+ * to service keys and the sym menu, and render() below never gets to run
+ * either, so the app looks completely wedged even though it is making
+ * progress. Parsing stays ahead of any real terminal output at this size. */
+#define DRAIN_UCHARS_PER_FRAME (READ_BUFFER_SIZE * 2)
+/* Minimum gap between frames while output keeps arriving. Rendering is by
+ * far the most expensive thing here (a glyph render per changed cell plus a
+ * full-screen blit), so coalescing bursts into ~60 fps is both faster
+ * overall and what keeps the UI thread's lock waits short. */
+#define FRAME_INTERVAL_MS 16
+
 /* This function is run in an SDL_Thread, and will check
  * for either input event indication or data from the
  * shell, then run the render loop
@@ -1776,25 +1932,43 @@ void sig_child(int signo){
 int run_render(void* data){
 
 	fd_set fds;
-	char ev_buf[100];
+	char ev_buf[256];
 	int n = 0;
 	UChar lbuf[READ_BUFFER_SIZE];
 	ssize_t num_chars = 0;
 	int master = io_get_master();
 	int first_output = 1;
+	int pending = 0;          /* parsed output not yet drawn */
+	Uint32 last_render = 0;
+	Uint32 now, since, wait_ms;
+	struct timeval tv;
+
 	while(!exit_application){
 		FD_ZERO(&fds);
 		FD_SET(master, &fds);
 		FD_SET(event_pipe[0], &fds);
-		n = select(1+max(master, event_pipe[0]), &fds, NULL, NULL, NULL);
+		/* With nothing to draw, block until something happens. With a frame
+		 * owed, wait no longer than the frame deadline. */
+		wait_ms = 0;
+		if(pending){
+			since = SDL_GetTicks() - last_render;
+			wait_ms = since >= FRAME_INTERVAL_MS ? 0 : FRAME_INTERVAL_MS - since;
+		}
+		tv.tv_sec = 0;
+		tv.tv_usec = wait_ms * 1000;
+		n = select(1+max(master, event_pipe[0]), &fds, NULL, NULL, pending ? &tv : NULL);
 		if(n < 0){
-			printf("Error calling select on inputs: %d\n", errno);
-		} else {
+			if(errno != EINTR){
+				printf("Error calling select on inputs: %d\n", errno);
+			}
+		} else if(n > 0) {
 			if(FD_ISSET(master, &fds)){
-				lock_input();
-				// Read anything from the child
-				while ((num_chars = io_read_master(lbuf, READ_BUFFER_SIZE)) > 0){
+				ssize_t budget = DRAIN_UCHARS_PER_FRAME;
+				lock_input_lowpri();
+				// Read anything from the child, up to this frame's budget
+				while(budget > 0 && (num_chars = io_read_master(lbuf, READ_BUFFER_SIZE)) > 0){
 					ecma48_filter_text(lbuf, num_chars);
+					budget -= num_chars;
 				}
 				/* Re-assert the window size once the child first speaks.
 				 * The initial SIGWINCH from sdl_init can be delivered to
@@ -1808,16 +1982,28 @@ int run_render(void* data){
 					set_tty_window_size();
 				}
 				unlock_input();
+				pending = 1;
 			}
 			if(FD_ISSET(event_pipe[0], &fds)){
-				// Just read the stuff and throw it away
-				read(event_pipe[0], (void*)ev_buf, 99);
+				// Just read the stuff and throw it away (the fd is
+				// non-blocking, so this drains and then returns -1)
+				while(read(event_pipe[0], (void*)ev_buf, sizeof(ev_buf)) > 0){}
+				pending = 1;
 			}
 		}
-		PRINT(stderr, "Render Loop\n");
-		lock_input();
-		render();
-		unlock_input();
+		/* Hand the main thread the lock it may have been waiting on for the
+		 * whole drain above: the mutex is not fair, and this thread is about
+		 * to ask for it again. */
+		sched_yield();
+		now = SDL_GetTicks();
+		if(pending && (Uint32)(now - last_render) >= FRAME_INTERVAL_MS){
+			PRINT(stderr, "Render Loop\n");
+			lock_input_lowpri();
+			render();
+			unlock_input();
+			last_render = now;
+			pending = 0;
+		}
 	}
 	/* never reached */
 	return 0;

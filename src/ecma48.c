@@ -2897,7 +2897,7 @@ parameter values:
 18 TABULATION STOP MODE (TSM)
 19 (Shall not be used; see F.5.1 in annex F)
 20 (Shall not be used; see F.5.2 in annex F)
-20 (vt100) LNM – Line Feed/New Line Mode - when reset, LF=>LF, when set LF=>CRLF
+20 (vt100) LNM - Line Feed/New Line Mode - when reset, LF=>LF, when set LF=>CRLF
 21 GRAPHIC RENDITION COMBINATION (GRCM)
 22 ZERO DEFAULT MODE (ZDM) (see F.4.2 in annex F)
 NOTE Private modes may be implemented using private parameters, see 5.4.1 and

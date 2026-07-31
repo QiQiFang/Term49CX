@@ -19,9 +19,14 @@ LIBPATHS += -L$(QNX_TARGET)/armle-v7/usr/lib
 LIBPATHS += -L./external/lib
 LIBS     += -lconfig -lSDL12 -lTouchControlOverlay
 
-# change these as needed (debug right now)
-#DEBUGFLAGS	:= -O2
-DEBUGFLAGS	:= -O0 -g -DDEBUGMSGS
+# Optimised by default, and without DEBUGMSGS: with it defined, PRINT()
+# expands to fprintf, and ecma48_filter_text() logs *every character* of
+# child output to stderr. On device that alone costs more than parsing and
+# rendering combined, and it is done while holding the input lock, so all
+# input stalls behind it whenever a tmux pane is producing output.
+# Override from the environment for a debug build, e.g.
+#   make DEBUGFLAGS='-O0 -g -DDEBUGMSGS'
+DEBUGFLAGS	?= -O2 -g
 # qcc target: works with both NDK 10.2 (gcc 4.6.3) and 10.3.1 (gcc 4.8.3)
 QCC_TARGET	?= gcc_ntoarmv7le
 CFLAGS    	:= $(INCLUDE) -V$(QCC_TARGET) -Wc,-std=gnu99 $(DEBUGFLAGS)

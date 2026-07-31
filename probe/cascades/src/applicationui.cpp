@@ -33,7 +33,7 @@ ApplicationUI::ApplicationUI(QObject *parent)
 
 	AbstractPane *root = qml->createRootObject<AbstractPane>();
 	if (!root) {
-		logLine("FATAL: createRootObject failed — QML error");
+		logLine("FATAL: createRootObject failed - QML error");
 		return;
 	}
 	Application::instance()->setScene(root);

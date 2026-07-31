@@ -178,9 +178,11 @@ int screen_to_buf_row(int y_screen){
 
 
 void buf_free_char(struct screenchar* sc){
-  if((sc->surface != NULL) && (sc->surface != blank_surface)){
-    SDL_FreeSurface(sc->surface);
-  }
+  /* Cell surfaces are borrowed - from main.c's glyph cache, or the shared
+   * blank surface - so they are not ours to release. The cache owns them
+   * and drops them all at once in glyph_cache_flush() when the font
+   * changes. Dropping the reference is all there is to do here, which also
+   * takes a free() off the path of every character the child prints. */
   sc->surface = NULL;
 }
 
