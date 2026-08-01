@@ -1,10 +1,24 @@
-# Term49
+# Term49C
 
-Term49 is a terminal emulator for BlackBerry 10. It is a continuation of the amazing [Term48](https://github.com/mordak/Term48) project by [mordak](https://github.com/mordak).
+**Term49C** is a terminal emulator for BlackBerry 10. The **C** stands for
+**Classic**: this fork is tuned for the BlackBerry Classic (Q20) hardware —
+physical keyboard, trackpad, and belt keys — while remaining usable on other
+BB10 devices.
 
-It implements (relevant parts of) the [ECMA-48 standard][ecma], but also includes some other control sequences to make it compliant with the `xterm-256color` terminfo specification. It is a work in progress, but is good enough for daily use. Pull requests, feature requests and bug reports are welcome.
+It continues the [Term49](https://github.com/BerryFarm/Term49) /
+[Term48](https://github.com/mordak/Term48) line by
+[mordak](https://github.com/mordak) and BerryFarm.
 
-The [current release](https://github.com/BerryFarm/Term49/releases) requires OS version >= 10.3.
+It implements (relevant parts of) the [ECMA-48 standard][ecma], plus extra
+control sequences for the `xterm-256color` terminfo. It is a work in progress,
+but good enough for daily use. Pull requests, feature requests, and bug reports
+are welcome.
+
+Requires OS version >= 10.3.
+
+**Install note:** official BlackBerry signing/distribution is no longer
+practical. Today Term49C can only be **sideloaded on a rooted BlackBerry 10
+OS**. Unsigned bars will not install on a stock, non-rooted device.
 
 ## Trackpad support (BlackBerry Classic / Q20)
 
@@ -53,7 +67,7 @@ Shift+Tab from the virtual keyboard also sends back-tab.
 
 ## Mouse support
 
-Term49 implements xterm mouse reporting (DECSET 9/1000/1002/1003, plus
+Term49C implements xterm mouse reporting (DECSET 9/1000/1002/1003, plus
 SGR 1006 coordinates). When an application enables mouse tracking (tmux
 with `set -g mouse on`, vim with `set mouse=a`, htop, mc, ...):
 
@@ -73,11 +87,10 @@ separators render as real lines instead of letters.
 
 ## Fallback font
 
-The default terminal font (Andale Mono) lacks many glyphs modern TUI
-programs draw with: braille patterns (dot-matrix logos and spinners),
-rounded box corners, block elements, powerline symbols. Characters the
-main font cannot draw are rendered with a bundled fallback font
-([Cascadia Mono](https://github.com/microsoft/cascadia-code), OFL
+The default terminal font may lack glyphs modern TUI programs draw with:
+braille patterns, rounded box corners, block elements, powerline symbols.
+Characters the main font cannot draw are rendered with a bundled fallback
+font ([Cascadia Mono](https://github.com/microsoft/cascadia-code), OFL
 licensed), instead of showing empty squares. Configure with
 `fallback_font_path` in `~/.term49rc` (set to `""` to disable).
 
@@ -100,13 +113,13 @@ licensed), instead of showing empty squares. Configure with
 
 ## Cursor styles
 
-Term49 honours `DECSCUSR` (`CSI Ps SP q`): applications can request a
+Term49C honours `DECSCUSR` (`CSI Ps SP q`): applications can request a
 block, underline, or bar cursor (vim, for example, uses this to show
 insert vs normal mode). Blinking variants render steady.
 
 ## Scrollback
 
-Term49 keeps scrollback history (`scrollback_lines` in `~/.term49rc`,
+Term49C keeps scrollback history (`scrollback_lines` in `~/.term49rc`,
 default `500` extra lines; `0` disables). To scroll:
 
 * **Touch**: drag a finger up/down on the screen — the content follows
@@ -121,13 +134,22 @@ with the trackpad) snaps back to the live screen. Full-screen applications
 
 ## Development
 
-To compile Term49, you will need some additional libraries:
+To compile Term49C you will need:
 
 * [libSDL][libsdl]
 * [Touch Control Overlay][tco]
 * [libconfig][libconfig]
 
-Prebuilt versions of these shared libraries are available in `external/lib` (see Makefile); to build from source you will need to check out the submodules (call `git clone` with the `--recursive` option) and build them with the Momentics IDE. Note that when compiling SDL, you must define `-D__PLAYBOOK__ -DRAW_KEYBOARD_EVENTS`.
+Prebuilt shared libraries are available in `external/lib` (see Makefile). To
+build them from source, check out the submodules (`git clone --recursive`) and
+build with the Momentics IDE. When compiling SDL, define
+`-D__PLAYBOOK__ -DRAW_KEYBOARD_EVENTS`.
+
+**Deployment:** there is no supported signing path for BlackBerry World or
+stock devices anymore. Build an unsigned bar and **sideload it onto a rooted
+BB10 OS** (for example with community tools such as
+[bb10d](https://github.com/jxw1102) / device-side package installers). Stock,
+non-rooted devices will reject the package.
 
 ### Building with Docker
 
@@ -137,61 +159,40 @@ build with Docker using a community BB10 NDK 10.3.1 image:
 * `./scripts/docker-build.sh` — builds `Device-Debug/Term49` and packages an
   unsigned `Term49C.bar`
 * `./scripts/docker-build.sh sdl` — additionally rebuilds the patched
-  `external/lib/libSDL12.so` from the `SDL` submodule (`term48` branch plus
+  `external/lib/libSDL12.so` from the `SDL` tree (`term48` branch plus
   `patches/sdl-term48-trackpad.patch`)
 
 The image (`delaya73/bbndk` by default, override with `BBNDK_IMAGE`) runs
 under x86 emulation on arm64 hosts, which is slow but works. By using the
-NDK you accept the BlackBerry SDK license. Sign or deploy the resulting bar
-with your own keys/debug token as described below.
+NDK you accept the BlackBerry SDK license. Sideload the resulting
+`Term49C.bar` on a rooted device — do not expect stock install or store
+signing to work.
 
 ### Building locally
 
-You can build and deploy Term49 without using Momentics IDE:
+You can build Term49C without Momentics:
 
 * Load the proper `bbndk-env` file
-* Copy your debug token to `signing/debugtoken.bar` (or see the section below on generating a debug token)
-* Populate the `BBIP` and `BBPASS` fields in `signing/bbpass` with your device's dev-mode IP address and device password
-* Update the `<author>` and `<authorId>` tags in `bar-descriptor.xml` to match the `Package-Author` and `Package-Author-Id` for your debug token: `unzip -p signing/debugtoken.bar META-INF/MANIFEST.MF | grep 'Package-Author:\|Package-Author-Id:'`
-* `make`
-* `make deploy`
+* `make` — produces the binary under `Device-Debug/`
+* Package with the Docker/container scripts, or your own `blackberry-nativepackager` invocation, to get `Term49C.bar`
+* Sideload the bar on a **rooted** BB10 device
 
-## Generating a Debug Token
+### Debugging with GDB
 
-* Use this form to obtain your `bbidtoken.csk` file: https://developer.blackberry.com/codesigning/
-* Copy `bbidtoken.csk` to `signing/bbidtoken.csk`
-* In `signing/bbpass`, fill in:
-  - `CNNAME`: the Common Name for your signing cert (usually your name)
-  - `KEYSTOREPASS`: CSK password you entered in step 1 signup
-  - `BBPIN`: target device's PIN
-  - `BBPASS`: target device's password
-* Run `make` in `signing/Makefile` to request and deploy the token to your device.
+On a rooted device with a working SSH/debug channel:
 
-Important: any symbols need to be escaped according to bash / Makefile rules e.g. backslashes before symbols `\!` and double dollar signs `\$$`.
+* Load `bbndk-env` on the host
+* Deploy and launch the app stopped if your tooling supports it
+* Attach `ntoarm-gdb` to the process on the device
 
-## Signing the release
-
-To distribute Term49, you need to sign the application bar with BlackBerry. To do that, run `make sign`.
-
-## Debugging with GDB
-
-To connect to the target device and enable debug tools such as GDB, the `blackberry-connect` tool must be started with the right arguments. For this, two terminals must have the correct `bbndk-env` environment loaded (or run the `make connect` command in the background).
-
-### Terminal 1: `blackberry-connect`
-* Start in the Term49 root directory.
-* `cd signing`
-* If the SSH key hasn't been generated yet, run `make ssh-key`.
-* `make connect`
-* Leave terminal running until done debugging.
-
-### Terminal 2: `gdb`
-* Start in the Term49 root directory.
-* `make launch-debug`
-* The package will be built, deployed to target device, and launched stopped. On host, `ntoarm-gdb` will start, connect to target device, and attach to the application process. To continue execution, run the GDB command `continue`. Further information on GDB can be found online.
+Exact steps depend on your root/debug setup; the historical Momentics
+debug-token + `blackberry-connect` signing flow is no longer documented here.
 
 ## See also
 
-* [Term48 in BlackBerry AppWorld](http://appworld.blackberry.com/webstore/content/26272878/)
+* [BerryFarm Term49](https://github.com/BerryFarm/Term49) (upstream)
+* [Term48](https://github.com/mordak/Term48) (original)
+* [Term48 on BlackBerry AppWorld](http://appworld.blackberry.com/webstore/content/26272878/) (historical)
 
 [ecma]: http://www.ecma-international.org/publications/standards/Ecma-048.htm
 [libsdl]: https://github.com/mordak/SDL/tree/term48
