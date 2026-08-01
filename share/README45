@@ -37,8 +37,14 @@ Ctrl-C: metamode, 'c', then 'c' again.
 
 Physical keyboard:
   - hold Space → toggle metamode
-  - double-tap right Shift → metamode
+    (this is the reliable way on Classic)
   - hold letter → uppercase
+
+Double-tap right Shift is the default for some
+devices but does **not** work on Classic (Q20) —
+no distinct right-Shift event. Use Space or the
+top-left hitbox. Optional: set
+metamode_doubletap_key to left Shift elsewhere.
 
 On Classic, use the trackpad for arrows and
 Menu for persistent Alt (section 2).
@@ -116,7 +122,7 @@ background_color = [0, 0, 0];
 screen_idle_awake = false;
 auto_show_vkb = true;
 
-metamode_doubletap_key = 61666;
+metamode_doubletap_key = 61666; /* right Shift; unused on Q20 */
 metamode_doubletap_delay = 500000000;
 keyhold_actions = true;
 keyhold_actions_exempt = [KEYCODE_BACKSPACE,

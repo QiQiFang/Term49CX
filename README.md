@@ -57,9 +57,14 @@ the prebuilt `external/lib/libSDL12.so`).
 Key tables are shift-aware. With Shift active — held down, or armed via
 the sticky shift key (`↑` indicator) — any metamode, sym-menu, or alt
 key bound to Tab sends back-tab (`ESC [ Z`) instead, i.e. Shift+Tab.
-So: tap Shift, arm metamode (double-tap right Shift, hold Space, or tap
-the top-left corner), then `t` (the default Tab binding) — or tap
-Shift, then pick Tab from your sym menu.
+So: arm Shift, then arm metamode (hold Space, or tap the top-left
+corner), then `t` (the default Tab binding) — or arm Shift and pick
+Tab from the sym menu.
+
+**Note:** the optional double-tap right-Shift metamode toggle does
+**not** work on BlackBerry Classic (Q20); the keyboard does not
+report a distinct right-Shift event. Use hold-Space or the corner
+hitbox on Classic.
 
 For custom shifted bindings, an uppercase entry in `metamode_keys` wins
 when Shift is active, e.g. `("T", "...")` alongside `("t", "\x09")`.

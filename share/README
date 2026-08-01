@@ -40,9 +40,18 @@ Example: Ctrl-C — touch top-left (metamode), 'c' (ctrl),
 then 'c' again.
 
 On a physical keyboard you can also:
-  - hold Space to toggle metamode
-  - double-tap right Shift to toggle metamode
+  - hold Space to toggle metamode (reliable on Classic)
   - hold letter keys for uppercase (keyhold_actions)
+
+Double-tap Shift is optional and device-dependent. The default
+is double-tap *right* Shift (metamode_doubletap_key =
+KEYCODE_RIGHT_SHIFT). On the BlackBerry Classic (Q20) that
+does **not** work: the hardware does not deliver a distinct
+right-Shift event the way Term49C expects. Use hold-Space or
+the top-left hitbox on Classic instead. On other devices (or
+Bluetooth keyboards that send right Shift) double-tap may work;
+you can also set metamode_doubletap_key to left Shift if your
+keyboard only reports that key.
 
 On the Classic, prefer the trackpad for arrows and the
 Menu belt key for persistent Alt (see below).
@@ -144,7 +153,7 @@ background_color = [0, 0, 0];
 screen_idle_awake = false;
 auto_show_vkb = true;
 
-metamode_doubletap_key = 61666;     /* KEYCODE_RIGHT_SHIFT */
+metamode_doubletap_key = 61666;     /* KEYCODE_RIGHT_SHIFT — not useful on Classic Q20 */
 metamode_doubletap_delay = 500000000;
 keyhold_actions = true;
 keyhold_actions_exempt = [KEYCODE_BACKSPACE, KEYCODE_RETURN];
