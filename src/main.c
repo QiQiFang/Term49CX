@@ -586,7 +586,7 @@ int font_init(int font_size){
 	/* Bundled monochrome outlines for supplementary-plane emoji.  Ordinary
 	 * BMP text remains on the Q20-tested UTF-16 string rendering path; only
 	 * non-BMP glyphs use the widened single-glyph path below. */
-	emoji_font = TTF_OpenFont("../app/native/fonts/NotoEmoji-Regular.ttf", font_size);
+	emoji_font = TTF_OpenFont("../app/native/fonts/NotoEmoji-Q20.ttf", font_size);
 	if(emoji_font != NULL){
 		TTF_SetFontStyle(emoji_font, TTF_STYLE_NORMAL);
 		TTF_SetFontOutline(emoji_font, 0);
@@ -613,7 +613,8 @@ static TTF_Font* font_for_char(UChar32 c){
 			return cjk_fonts[i];
 		}
 	}
-	if(emoji_font != NULL && TTF_GlyphIsProvided(emoji_font, c)){
+	if(emoji_font != NULL && c >= 0x1f000 && c <= 0x1faff &&
+	   TTF_GlyphIsProvided(emoji_font, 0xe000 + (c - 0x1f000))){
 		return emoji_font;
 	}
 	return font;
@@ -651,6 +652,9 @@ static struct glyph_entry glyph_cache[GLYPH_CACHE_SLOTS];
  * on-device, so reserve that path for non-BMP code points. */
 static SDL_Surface* render_char_shaded(TTF_Font* rfont, UChar32 c,
 		SDL_Color fg, SDL_Color bg){
+	if(rfont == emoji_font && c >= 0x1f000 && c <= 0x1faff){
+		c = 0xe000 + (c - 0x1f000);
+	}
 	if(c <= 0xffff){
 		UChar str[2] = {(UChar)c, 0};
 		return TTF_RenderUNICODE_Shaded(rfont, str, fg, bg);
