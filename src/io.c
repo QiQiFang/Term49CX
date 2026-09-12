@@ -148,21 +148,46 @@ static ssize_t write_all_master(const char* buf, size_t len){
 }
 
 ssize_t io_write_master(const UChar *buf, size_t nUChar){
-
-	char* target = writebuf;
-	char* targetLimit = writebuf + (CHARACTER_BUFFER * U8_MAX_LENGTH);
+	size_t output_capacity;
+	char* output;
+	char* target;
+	char* targetLimit;
 	const UChar* source = buf;
 	const UChar* sourceLimit = buf + nUChar;
+	ssize_t written;
+
+	/* CHARACTER_BUFFER is intentionally tiny for individual key events, but
+	 * native IME submissions can contain thousands of UTF-16 code units.
+	 * Allocate those writes to their real worst-case UTF-8 size instead of
+	 * silently truncating them to CHARACTER_BUFFER * U8_MAX_LENGTH bytes. */
+	output_capacity = nUChar * U8_MAX_LENGTH;
+	if(output_capacity == 0){
+		return 0;
+	}
+	output = (nUChar <= CHARACTER_BUFFER) ? writebuf : malloc(output_capacity);
+	if(output == NULL){
+		return -1;
+	}
+	target = output;
+	targetLimit = output + output_capacity;
 
 	ucnv_fromUnicode(tty_conv, &target, targetLimit, &source, sourceLimit, NULL, TRUE, &tty_conv_err);
 
   if(tty_conv_err == U_BUFFER_OVERFLOW_ERROR){
-  	fprintf(stderr, "ucnv_fromUnicode() in io_write_master ran out of target buffer\n");
-  	tty_conv_err = U_ZERO_ERROR;
+	  	fprintf(stderr, "ucnv_fromUnicode() in io_write_master ran out of target buffer\n");
+	  	tty_conv_err = U_ZERO_ERROR;
   }
 
-  writebufLimit = target;
-	return write_all_master(writebuf, (size_t)(target - writebuf));
+	written = write_all_master(output, (size_t)(target - output));
+	if(output == writebuf){
+		writebufLimit = target;
+	} else {
+		/* A long IME/paste submission is not eligible for Meta uppercase of
+		 * the last physical keystroke. Avoid retaining a dangling pointer. */
+		writebufLimit = writebuf;
+		free(output);
+	}
+	return written;
 }
 
 ssize_t io_write_master_char(const char *buf, size_t n){
