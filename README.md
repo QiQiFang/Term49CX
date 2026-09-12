@@ -1,13 +1,20 @@
-# Term49C
+# Term49CX
 
-**Term49C** is a terminal emulator for BlackBerry 10. The **C** stands for
-**Classic**: this fork is tuned for the BlackBerry Classic (Q20) hardware —
-physical keyboard, trackpad, and belt keys — while remaining usable on other
-BB10 devices.
+**Term49CX** is an enhanced continuation of
+[jxw1102/Term49C](https://github.com/jxw1102/Term49C), a native terminal
+emulator for BlackBerry 10. The lineage is:
 
-It continues the [Term49](https://github.com/BerryFarm/Term49) /
-[Term48](https://github.com/mordak/Term48) line by
-[mordak](https://github.com/mordak) and BerryFarm.
+> Term48 → Term49 → Term49C → Term49CX
+
+The **C** retains the BlackBerry **Classic** focus of Term49C, while **X**
+denotes this fork's extended input, Unicode, rendering, and modern TUI
+compatibility work. The application name and package identity intentionally
+remain **Term49C**, so existing installations can be upgraded in place instead
+of creating a second application.
+
+Term49CX is developed and tested on a BlackBerry Classic Q20 running BB10
+10.3.3. It preserves the physical keyboard, trackpad, belt-key, terminal, and
+scrollback behavior inherited from Term49C.
 
 It implements (relevant parts of) the [ECMA-48 standard][ecma], plus extra
 control sequences for the `xterm-256color` terminfo. It is a work in progress,
@@ -19,6 +26,36 @@ Requires OS version >= 10.3.
 **Install note:** official BlackBerry signing/distribution is no longer
 practical. Today Term49C can only be **sideloaded on a rooted BlackBerry 10
 OS**. Unsigned bars will not install on a stock, non-rooted device.
+
+## What Term49CX adds
+
+The current device-tested build is **1.0.12**. Compared with the Term49C fork,
+Term49CX adds or fixes:
+
+* **Native BB10 IME input:** press Meta+i to compose Chinese or other IME text
+  in a reusable system dialog, then submit it with physical Enter or Send.
+* **Reliable long IME submissions:** text is converted and written using a
+  dynamically sized buffer rather than the original 40-byte key buffer, so
+  longer Chinese messages are not truncated after roughly 13 characters.
+* **Input isolation:** keys used for IME composition do not leak into the shell
+  or the TUI running behind the dialog, and dismissing the dialog does not lock
+  further terminal input.
+* **CJK and wide-character layout:** double-width cells remain aligned while
+  displaying Chinese and other East Asian text.
+* **Monochrome emoji:** supplementary-plane emoji are rendered through a
+  bundled Noto Emoji font. Because the Q20's legacy FreeType/SDL_ttf stack does
+  not reliably consume cmap format 12, supported U+1F000–U+1FAFF glyphs are
+  mirrored into the BMP Private Use Area and rendered through the proven
+  UTF-16 path.
+* **Modern TUI rendering:** DEC synchronized-output mode 2026 avoids visible
+  intermediate redraws and scrolling when compatible applications repaint a
+  frame.
+* **Terminal usability:** trackpad navigation and mouse reporting, touch and
+  Alt+trackpad scrolling, copy/paste and OSC 52 clipboard support, fallback
+  glyphs, DEC line drawing, Shift+Tab, and cursor-style handling.
+
+The source commits and device validation history are kept in Git so regressions
+in the legacy BB10 graphics and input stack can be traced independently.
 
 ## Trackpad support (BlackBerry Classic / Q20)
 
