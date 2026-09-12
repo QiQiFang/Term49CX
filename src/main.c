@@ -73,6 +73,7 @@ static int vmodifiers = 0;
 
 static TTF_Font* font;
 static TTF_Font* fallback_font;
+static TTF_Font* emoji_font;
 /* Chain of CJK faces tried in order for glyphs the fonts above lack. No single
  * BB10 face covers all of CJK: the Simplified Hei (GB18030) has Han but not
  * Japanese kana or Hangul, so extra faces are chained (MSung/cp950 for kana,
@@ -582,11 +583,22 @@ int font_init(int font_size){
 		}
 	}
 
+	/* Bundled monochrome outlines for supplementary-plane emoji. */
+	emoji_font = TTF_OpenFont("../app/native/fonts/NotoEmoji-Regular.ttf", font_size);
+	if(emoji_font != NULL){
+		TTF_SetFontStyle(emoji_font, TTF_STYLE_NORMAL);
+		TTF_SetFontOutline(emoji_font, 0);
+		TTF_SetFontKerning(emoji_font, 0);
+		TTF_SetFontHinting(emoji_font, TTF_HINTING_NORMAL);
+	} else {
+		fprintf(stderr, "No monochrome emoji font: %s\n", SDL_GetError());
+	}
+
 	return TERM_SUCCESS;
 }
 
 /* pick the font that can actually draw this character */
-static TTF_Font* font_for_char(UChar c){
+static TTF_Font* font_for_char(UChar32 c){
 	if(TTF_GlyphIsProvided(font, c)){
 		return font;
 	}
@@ -598,6 +610,9 @@ static TTF_Font* font_for_char(UChar c){
 		if(TTF_GlyphIsProvided(cjk_fonts[i], c)){
 			return cjk_fonts[i];
 		}
+	}
+	if(emoji_font != NULL && TTF_GlyphIsProvided(emoji_font, c)){
+		return emoji_font;
 	}
 	return font;
 }
@@ -622,7 +637,7 @@ static TTF_Font* font_for_char(UChar c){
 
 struct glyph_entry {
 	SDL_Surface* surface;
-	UChar c;
+	UChar32 c;
 	int style;
 	Uint32 fg, bg;
 	char used;
@@ -648,8 +663,7 @@ void glyph_cache_flush(){
  * *shared is 1 when the surface belongs to the cache - borrow it, never
  * free it. It is 0 only when the bucket is full, in which case the caller
  * owns the returned surface and must free it after drawing. */
-static SDL_Surface* glyph_render(UChar c, int style, SDL_Color fg, SDL_Color bg, int* shared){
-	UChar str[2] = {c, 0};
+static SDL_Surface* glyph_render(UChar32 c, int style, SDL_Color fg, SDL_Color bg, int* shared){
 	Uint32 pfg = pack_color(fg);
 	Uint32 pbg = pack_color(bg);
 	Uint32 h = ((Uint32)c * 2654435761u) ^ ((Uint32)style * 40503u)
@@ -670,7 +684,7 @@ static SDL_Surface* glyph_render(UChar c, int style, SDL_Color fg, SDL_Color bg,
 		/* empty slot: rasterise into it */
 		rfont = font_for_char(c);
 		TTF_SetFontStyle(rfont, style);
-		e->surface = TTF_RenderUNICODE_Shaded(rfont, str, fg, bg);
+		e->surface = TTF_RenderGlyph_Shaded(rfont, c, fg, bg);
 		if(e->surface == NULL){
 			*shared = 1;
 			return NULL;
@@ -688,7 +702,7 @@ static SDL_Surface* glyph_render(UChar c, int style, SDL_Color fg, SDL_Color bg,
 	rfont = font_for_char(c);
 	TTF_SetFontStyle(rfont, style);
 	*shared = 0;
-	return TTF_RenderUNICODE_Shaded(rfont, str, fg, bg);
+	return TTF_RenderGlyph_Shaded(rfont, c, fg, bg);
 }
 
 void font_uninit(){
@@ -702,6 +716,10 @@ void font_uninit(){
 		cjk_fonts[i] = NULL;
 	}
 	num_cjk_fonts = 0;
+	if(emoji_font != NULL){
+		TTF_CloseFont(emoji_font);
+		emoji_font = NULL;
+	}
 	if(fallback_font != NULL){
 		TTF_CloseFont(fallback_font);
 		fallback_font = NULL;
@@ -1634,7 +1652,7 @@ static UChar* selection_to_text(int* out_len){
 		return NULL;
 	}
 	buf_sel_get(&r1, &c1, &r2, &c2);
-	int cap = (r2 - r1 + 1) * (cols + 1) + 1;
+	int cap = (r2 - r1 + 1) * (cols * 2 + 1) + 1;
 	UChar* text = calloc(cap, sizeof(UChar));
 	if(text == NULL){ *out_len = 0; return NULL; }
 	int n = 0;
@@ -1654,8 +1672,15 @@ static UChar* selection_to_text(int* out_len){
 			if(buf->text[row][col].wide == 2){
 				continue;
 			}
-			UChar c = buf->text[row][col].c;
-			text[n++] = (c == 0) ? ' ' : c;
+			UChar32 c = buf->text[row][col].c;
+			if(c == 0){
+				text[n++] = ' ';
+			} else if(c <= 0xffff){
+				text[n++] = (UChar)c;
+			} else {
+				text[n++] = U16_LEAD(c);
+				text[n++] = U16_TRAIL(c);
+			}
 		}
 		if(row != r2){
 			text[n++] = '\n';
@@ -1670,8 +1695,6 @@ void render() {
 	int offset;
 	struct screenchar* sc;
 	SDL_Surface* torender;
-	UChar str[2];
-	str[1] = NULL;
 
 	/* Set the background */
 	SDL_FillRect(screen, NULL, SDL_MapRGB(screen->format, default_bg_color.r, default_bg_color.g, default_bg_color.b));
@@ -1768,13 +1791,12 @@ void render() {
 
 		sc = &buf->text[buf->line][drawcols];
 		if(sc->c){
-			str[0] = sc->c;
 			TTF_Font *rfont = font_for_char(sc->c);
 			TTF_SetFontStyle(rfont, sc->style.style);
 			if(buf->inverse_video){
-				inv_cursor = TTF_RenderUNICODE_Shaded(rfont, str, adjust_color(sc->style.fg_color, sc->style), sc->style.bg_color);
+				inv_cursor = TTF_RenderGlyph_Shaded(rfont, sc->c, adjust_color(sc->style.fg_color, sc->style), sc->style.bg_color);
 			} else {
-				inv_cursor = TTF_RenderUNICODE_Shaded(rfont, str, adjust_color(sc->style.bg_color, sc->style), sc->style.fg_color);
+				inv_cursor = TTF_RenderGlyph_Shaded(rfont, sc->c, adjust_color(sc->style.bg_color, sc->style), sc->style.fg_color);
 			}
 			if(inv_cursor == NULL){
 				PRINT(stderr, "Rendering failed for char %d\n", (int)sc->c);

@@ -29,7 +29,8 @@ struct font_style {
 };
 
 struct screenchar {
-  UChar c;
+  /* Complete Unicode scalar value; UChar alone splits non-BMP emoji. */
+  UChar32 c;
   struct font_style style;
   SDL_Surface* surface;
   /* 0 = single-width, 1 = lead cell of a double-width (CJK) char whose

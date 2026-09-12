@@ -28,6 +28,8 @@
     
     <asset path="external/fonts/CascadiaMonoPL-Regular.ttf">fonts/CascadiaMonoPL-Regular.ttf</asset>
     <asset path="external/fonts/LICENSE-Cascadia">fonts/LICENSE-Cascadia</asset>
+    <asset path="external/fonts/NotoEmoji-Regular.ttf">fonts/NotoEmoji-Regular.ttf</asset>
+    <asset path="external/fonts/LICENSE-NotoEmoji">fonts/LICENSE-NotoEmoji</asset>
     <asset path="external/lib/libconfig.so" type="Qnx/Elf">lib/libconfig.so.11</asset>
     <asset path="external/lib/libSDL12.so" type="Qnx/Elf">lib/libSDL12.so</asset>
     <asset path="external/lib/libTouchControlOverlay.so" type="Qnx/Elf">lib/libTouchControlOverlay.so</asset>
@@ -41,7 +43,7 @@
     </configuration>
 
     <name>Term49C</name>
-    <versionNumber>1.0.6</versionNumber>
+    <versionNumber>1.0.7</versionNumber>
     <buildId>1</buildId>
 
     <!-- May have multiple values for each language. See samples or xsd schema file. -->

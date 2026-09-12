@@ -98,7 +98,8 @@ struct ecma48_modes {
 };
 
 static struct ecma48_modes modes;
-static UChar last_char;
+static UChar32 last_char;
+static UChar pending_high_surrogate;
 
 /* OSC (operating system command) string accumulator, large enough for
  * OSC 52 clipboard payloads (base64) */
@@ -272,15 +273,20 @@ void ecma48_end_control(){
 
 /* display columns a character occupies: 2 for East-Asian wide/fullwidth
  * (CJK), 1 otherwise. */
-static int ecma48_char_width(UChar c){
+static int ecma48_char_width(UChar32 c){
   if(c < 0x1100){ /* fast path: Latin, punctuation, controls */
     return 1;
   }
-  int ea = u_getIntPropertyValue((UChar32)c, UCHAR_EAST_ASIAN_WIDTH);
+  /* Older ICU builds predate the Emoji properties. Treat the Unicode
+   * supplementary pictograph blocks as terminal-wide explicitly. */
+  if(c >= 0x1f000 && c <= 0x1faff){
+    return 2;
+  }
+  int ea = u_getIntPropertyValue(c, UCHAR_EAST_ASIAN_WIDTH);
   return (ea == U_EA_WIDE || ea == U_EA_FULLWIDTH) ? 2 : 1;
 }
 
-void ecma48_add_char(UChar c){
+void ecma48_add_char(UChar32 c){
 
   /* apply the active SCS charset (DEC Special Graphics line drawing) */
   if(charset[(int)charset_shift] == '0' && c >= 0x60 && c <= 0x7e){
@@ -3774,7 +3780,24 @@ void ecma48_filter_text(UChar* tbuf, ssize_t chars){
           case 0x1d: ecma48_IS3(); break;
           case 0x1e: ecma48_IS2(); break;
           case 0x1f: ecma48_IS1(); break;
-          default: ecma48_add_char(tbuf[i]); break;
+          default:
+            if(U16_IS_LEAD(tbuf[i])){
+              pending_high_surrogate = tbuf[i];
+            } else if(U16_IS_TRAIL(tbuf[i])){
+              if(pending_high_surrogate){
+                ecma48_add_char(U16_GET_SUPPLEMENTARY(pending_high_surrogate, tbuf[i]));
+                pending_high_surrogate = 0;
+              } else {
+                ecma48_add_char(0xfffd);
+              }
+            } else {
+              if(pending_high_surrogate){
+                ecma48_add_char(0xfffd);
+                pending_high_surrogate = 0;
+              }
+              ecma48_add_char((UChar32)tbuf[i]);
+            }
+            break;
         }; break;
       case ECMA48_STATE_C1:
         switch(tbuf[i]){

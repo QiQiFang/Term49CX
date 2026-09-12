@@ -72,7 +72,7 @@ typedef struct cached_glyph {
 	int maxy;
 	int yoffset;
 	int advance;
-	Uint16 cached;
+	Uint32 cached;
 } c_glyph;
 
 /* The structure used to hold internal font information */
@@ -572,7 +572,7 @@ static void Flush_Cache( TTF_Font* font )
 	}
 }
 
-static FT_Error Load_Glyph( TTF_Font* font, Uint16 ch, c_glyph* cached, int want )
+static FT_Error Load_Glyph( TTF_Font* font, Uint32 ch, c_glyph* cached, int want )
 {
 	FT_Face face;
 	FT_Error error;
@@ -886,7 +886,7 @@ static FT_Error Load_Glyph( TTF_Font* font, Uint16 ch, c_glyph* cached, int want
 	return 0;
 }
 
-static FT_Error Find_Glyph( TTF_Font* font, Uint16 ch, int want )
+static FT_Error Find_Glyph( TTF_Font* font, Uint32 ch, int want )
 {
 	int retval = 0;
 	int hsize = sizeof( font->cache ) / sizeof( font->cache[0] );
@@ -1011,12 +1011,12 @@ char *TTF_FontFaceStyleName(const TTF_Font *font)
 	return(font->face->style_name);
 }
 
-int TTF_GlyphIsProvided(const TTF_Font *font, Uint16 ch)
+int TTF_GlyphIsProvided(const TTF_Font *font, Uint32 ch)
 {
   return(FT_Get_Char_Index(font->face, ch));
 }
 
-int TTF_GlyphMetrics(TTF_Font *font, Uint16 ch,
+int TTF_GlyphMetrics(TTF_Font *font, Uint32 ch,
                      int* minx, int* maxx, int* miny, int* maxy, int* advance)
 {
 	FT_Error error;
@@ -1426,7 +1426,7 @@ SDL_Surface *TTF_RenderUNICODE_Solid(TTF_Font *font,
 	return textbuf;
 }
 
-SDL_Surface *TTF_RenderGlyph_Solid(TTF_Font *font, Uint16 ch, SDL_Color fg)
+SDL_Surface *TTF_RenderGlyph_Solid(TTF_Font *font, Uint32 ch, SDL_Color fg)
 {
 	SDL_Surface *textbuf;
 	SDL_Palette *palette;
@@ -1692,7 +1692,7 @@ SDL_Surface* TTF_RenderUNICODE_Shaded( TTF_Font* font,
 }
 
 SDL_Surface* TTF_RenderGlyph_Shaded( TTF_Font* font,
-				     Uint16 ch,
+				     Uint32 ch,
 				     SDL_Color fg,
 				     SDL_Color bg )
 {
@@ -1953,7 +1953,7 @@ SDL_Surface *TTF_RenderUNICODE_Blended(TTF_Font *font,
 	return(textbuf);
 }
 
-SDL_Surface *TTF_RenderGlyph_Blended(TTF_Font *font, Uint16 ch, SDL_Color fg)
+SDL_Surface *TTF_RenderGlyph_Blended(TTF_Font *font, Uint32 ch, SDL_Color fg)
 {
 	SDL_Surface *textbuf;
 	Uint32 alpha;
