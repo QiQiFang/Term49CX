@@ -111,6 +111,12 @@ static dialog_instance_t text_input_dialog = NULL;
  * key events to SDL.  Suppress those events so IME composition cannot leak
  * j/k/etc. into the terminal or a full-screen TUI. */
 static char text_input_active = 0;
+/* Candidate-strip and virtual-keyboard height changes from the native IME
+ * must not resize the terminal behind its modal dialog. */
+static char text_input_vkb_suppressed = 0;
+/* Swallow the final key/touch release events produced while the system dialog
+ * is being dismissed. */
+static uint64_t text_input_guard_until_ns = 0;
 
 static SDL_mutex *input_mutex = NULL;
 
@@ -130,8 +136,10 @@ static void show_text_input_dialog(void)
 		 * DIALOG_RESPONSE is unreliable on some BB10 10.3.3 builds. */
 		dialog_set_prompt_input_field(text_input_dialog, "");
 		text_input_active = 1;
+		text_input_vkb_suppressed = 1;
 		if(dialog_show(text_input_dialog) != BPS_SUCCESS){
 			text_input_active = 0;
+			text_input_vkb_suppressed = 0;
 		}
 		return;
 	}
@@ -149,8 +157,10 @@ static void show_text_input_dialog(void)
 	dialog_set_default_button_index(text_input_dialog, 1);
 	dialog_set_enter_key_type(text_input_dialog, VIRTUALKEYBOARD_ENTER_SEND);
 	text_input_active = 1;
+	text_input_vkb_suppressed = 1;
 	if(dialog_show(text_input_dialog) != BPS_SUCCESS){
 		text_input_active = 0;
+		text_input_vkb_suppressed = 0;
 		dialog_destroy(text_input_dialog);
 		text_input_dialog = NULL;
 	}
@@ -170,6 +180,11 @@ void handleDialogEvent(bps_event_t *event)
 	 * context over visual/index ordering, which can vary with locale. */
 	context = dialog_event_get_selected_context(event);
 	text_input_active = 0;
+	{
+		struct timespec now;
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		text_input_guard_until_ns = timespec2nsec(&now) + 350000000ULL;
+	}
 	if(context != NULL && strcmp(context, "send") == 0){
 		text = dialog_event_get_prompt_input_field(event);
 		if(text != NULL && text[0] != '\0'){
@@ -180,6 +195,17 @@ void handleDialogEvent(bps_event_t *event)
 
 	/* Keep the instance alive and reuse it on the next Meta+i.  The dialog
 	 * service hides it after the response; it is destroyed during uninit. */
+}
+
+int isTextInputBlocked(void)
+{
+	struct timespec now;
+
+	if(text_input_active){
+		return 1;
+	}
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	return timespec2nsec(&now) < text_input_guard_until_ns;
 }
 
 /* leftover touch-drag pixels not yet turned into scrolled lines */
@@ -729,6 +755,15 @@ void handle_virtualkeyboard_event(bps_event_t *event){
 	int resolution[2] = {screen->w, screen->h};
 
 	vkb_h = get_virtualkeyboard_height();
+
+	if(text_input_vkb_suppressed){
+		/* Since the terminal was not resized when this prompt appeared, its
+		 * matching HIDDEN notification must not resize it on dismissal. */
+		if(event_code == VIRTUALKEYBOARD_EVENT_HIDDEN){
+			text_input_vkb_suppressed = 0;
+		}
+		return;
+	}
 
 	switch (event_code){
 	case VIRTUALKEYBOARD_EVENT_VISIBLE:

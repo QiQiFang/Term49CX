@@ -549,6 +549,9 @@ extern void handleKeyboardEvent(screen_event_t event);
 /* Trackpad on devices like the BlackBerry Classic (Q20) shows up as a
  * joystick input device. Let the application decide what to do with it. */
 extern void handleTrackpadEvent(screen_event_t event);
+/* Native IME prompts own input while visible, including the trailing release
+ * events generated as the system dialog is dismissed. */
+extern int isTextInputBlocked(void);
 /* Belt keys (send/end/back) on the BlackBerry Classic arrive as navigator
  * syskey events. Returns nonzero if the application handled the key. */
 extern int handleSyskeyEvent(int syskey);
@@ -849,6 +852,13 @@ void handleScreenEvent(_THIS, bps_event_t *event)
 	int rc = screen_get_event_property_iv(se, SCREEN_PROPERTY_TYPE, &type);
 	if (rc || type == SCREEN_EVENT_NONE)
 		return;
+
+	if (isTextInputBlocked() &&
+	    (type == SCREEN_EVENT_KEYBOARD || type == SCREEN_EVENT_JOYSTICK ||
+	     type == SCREEN_EVENT_POINTER || type == SCREEN_EVENT_MTOUCH_TOUCH ||
+	     type == SCREEN_EVENT_MTOUCH_MOVE || type == SCREEN_EVENT_MTOUCH_RELEASE)){
+		return;
+	}
 
 	screen_window_t window;
 	screen_get_event_property_pv(se, SCREEN_PROPERTY_WINDOW, (void **)&window);

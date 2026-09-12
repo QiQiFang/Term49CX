@@ -117,7 +117,9 @@ licensed), instead of showing empty squares. Configure with
   hardware keystrokes are isolated from the terminal so composition keys do
   not leak into shells or full-screen TUI applications. Dialog responses are
   consumed synchronously in the SDL/BPS event pump, before their BPS payload
-  becomes invalid.
+  becomes invalid. Virtual-keyboard candidate/height notifications are also
+  isolated, preventing each IME update (and dialog dismissal) from resizing
+  or snapping the terminal view, and trailing dismissal input is swallowed.
 * **Remote clipboard (OSC 52)**: programs can set the phone's clipboard
   with an `OSC 52` escape — so `tmux` (`set -s set-clipboard on`), vim
   (`set clipboard=unnamed` with an OSC 52 plugin), and similar tools can
