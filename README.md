@@ -125,6 +125,11 @@ licensed), instead of showing empty squares. Configure with
   (`set clipboard=unnamed` with an OSC 52 plugin), and similar tools can
   copy to the BlackBerry clipboard even over SSH. Clipboard *reads* via
   OSC 52 are ignored for privacy.
+* **Synchronized output (DEC mode 2026)**: modern full-screen TUIs can wrap a
+  frame in `CSI ? 2026 h` / `CSI ? 2026 l`. Term49C defers intermediate
+  paints until the frame closes, avoiding partial-screen scrolling/flicker;
+  a one-second safety timeout prevents a malformed sequence from freezing
+  the display.
 
 ## Cursor styles
 

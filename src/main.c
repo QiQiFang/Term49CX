@@ -2052,6 +2052,9 @@ void sig_child(int signo){
  * full-screen blit), so coalescing bursts into ~60 fps is both faster
  * overall and what keeps the UI thread's lock waits short. */
 #define FRAME_INTERVAL_MS 16
+/* ECMA-48 synchronized output should normally close within one TUI frame.
+ * Never let a malformed or interrupted application freeze the display. */
+#define SYNC_OUTPUT_TIMEOUT_MS 1000
 
 /* This function is run in an SDL_Thread, and will check
  * for either input event indication or data from the
@@ -2068,6 +2071,7 @@ int run_render(void* data){
 	int first_output = 1;
 	int pending = 0;          /* parsed output not yet drawn */
 	Uint32 last_render = 0;
+	Uint32 sync_started = 0;
 	Uint32 now, since, wait_ms;
 	struct timeval tv;
 
@@ -2079,8 +2083,18 @@ int run_render(void* data){
 		 * owed, wait no longer than the frame deadline. */
 		wait_ms = 0;
 		if(pending){
-			since = SDL_GetTicks() - last_render;
-			wait_ms = since >= FRAME_INTERVAL_MS ? 0 : FRAME_INTERVAL_MS - since;
+			now = SDL_GetTicks();
+			if(ecma48_synchronized_output()){
+				if(sync_started == 0){
+					sync_started = now;
+				}
+				since = now - sync_started;
+				wait_ms = since >= SYNC_OUTPUT_TIMEOUT_MS ? 0 : FRAME_INTERVAL_MS;
+			} else {
+				sync_started = 0;
+				since = now - last_render;
+				wait_ms = since >= FRAME_INTERVAL_MS ? 0 : FRAME_INTERVAL_MS - since;
+			}
 		}
 		tv.tv_sec = 0;
 		tv.tv_usec = wait_ms * 1000;
@@ -2124,12 +2138,18 @@ int run_render(void* data){
 		 * to ask for it again. */
 		sched_yield();
 		now = SDL_GetTicks();
-		if(pending && (Uint32)(now - last_render) >= FRAME_INTERVAL_MS){
+		if(pending && ecma48_synchronized_output() && sync_started == 0){
+			sync_started = now;
+		}
+		if(pending && (Uint32)(now - last_render) >= FRAME_INTERVAL_MS &&
+		   (!ecma48_synchronized_output() ||
+		    (Uint32)(now - sync_started) >= SYNC_OUTPUT_TIMEOUT_MS)){
 			PRINT(stderr, "Render Loop\n");
 			lock_input_lowpri();
 			render();
 			unlock_input();
 			last_render = now;
+			sync_started = 0;
 			pending = 0;
 		}
 	}

@@ -33,6 +33,8 @@ void ecma48_filter_text(UChar* tbuf, ssize_t chars);
 /* xterm mouse tracking: returns the active DECSET mode
  * (9/1000/1002/1003) or 0 when off */
 int  ecma48_mouse_tracking();
+/* xterm synchronized output (DECSET/DECRST 2026) */
+int  ecma48_synchronized_output();
 /* send a mouse report; cb: 0=left 1=middle 2=right 64/65=wheel,
  * +32 for motion; col/row are 1-based screen cells */
 void ecma48_send_mouse_event(int cb, int press, int col, int row);

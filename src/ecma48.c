@@ -94,6 +94,7 @@ struct ecma48_modes {
   int  mouse_mode;   /* xterm mouse tracking: DECSET 9/1000/1002/1003, 0 = off */
   char mouse_sgr;    /* DECSET 1006: SGR extended mouse coordinates */
   char bracketed_paste; /* DECSET 2004 */
+  char synchronized_output; /* DECSET 2026 */
 };
 
 static struct ecma48_modes modes;
@@ -215,6 +216,7 @@ void ecma48_resetModes(){
   modes.mouse_mode = 0;
   modes.mouse_sgr = 0;
   modes.bracketed_paste = 0;
+  modes.synchronized_output = 0;
   charset[0] = 'B';
   charset[1] = 'B';
   charset_shift = 0;
@@ -3500,6 +3502,7 @@ void ansi_SM(){
         case 1006: modes.mouse_sgr = 1; break;
         case 1015: break; /* urxvt coordinates not supported */
         case 2004: modes.bracketed_paste = 1; break;
+        case 2026: modes.synchronized_output = 1; break;
         case 1047: buf_save_text(); break;
         case 1048: buf_save_cursor(); break;
         case 1049: buf_save_cursor(); buf_save_text(); break;
@@ -3552,6 +3555,7 @@ void ansi_RM(){
         case 1006: modes.mouse_sgr = 0; break;
         case 1015: break;
         case 2004: modes.bracketed_paste = 0; break;
+        case 2026: modes.synchronized_output = 0; break;
         case 1047: buf_restore_text(); break;
         case 1048: buf_restore_cursor(); break;
         case 1049: buf_restore_text(); buf_restore_cursor(); break;
@@ -3678,6 +3682,7 @@ void dec_DECSTR(){
   modes.mouse_mode = 0; // mouse tracking off
   modes.mouse_sgr = 0;
   modes.bracketed_paste = 0;
+  modes.synchronized_output = 0;
   charset[0] = 'B'; // US ASCII in G0/G1
   charset[1] = 'B';
   charset_shift = 0;
@@ -3993,6 +3998,10 @@ void ecma48_filter_text(UChar* tbuf, ssize_t chars){
 /* xterm mouse tracking: 0 when off, else the DECSET mode number */
 int ecma48_mouse_tracking(){
   return modes.mouse_mode;
+}
+
+int ecma48_synchronized_output(){
+  return modes.synchronized_output;
 }
 
 /* Send an xterm mouse report to the application.
