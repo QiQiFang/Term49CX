@@ -84,7 +84,10 @@ features:
 Term49CX requires BlackBerry OS 10.3 or later. The current device-tested feature
 baseline is version **1.0.12**; version **1.0.13** changes the displayed
 application name to Term49CX while retaining Term49C's package ID so an existing
-installation is upgraded in place and keeps its configuration.
+installation is upgraded in place and keeps its configuration. Version
+**1.0.21** fixes native IME Send/Cancel dismissal hangs on the BlackBerry
+Classic. The prompt continues to use its touchscreen Cancel button; unsupported
+hardware Back-key cancellation experiments are not included.
 
 Official BlackBerry signing and distribution are no longer practical. Current
 builds are unsigned BAR packages and require a BB10 system configured to accept
