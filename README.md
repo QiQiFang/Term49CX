@@ -1,16 +1,17 @@
 # Term49CX
 
-**Term49CX** is an enhanced continuation of
+**Term49CX** is based on
 [jxw1102/Term49C](https://github.com/jxw1102/Term49C), a native terminal
-emulator for BlackBerry 10. The lineage is:
+emulator for BlackBerry 10. It keeps Term49C's design and usage model while
+adding device-tested input, Unicode, rendering, and modern TUI compatibility
+improvements. The project lineage is:
 
 > Term48 → Term49 → Term49C → Term49CX
 
 The **C** retains the BlackBerry **Classic** focus of Term49C, while **X**
-denotes this fork's extended input, Unicode, rendering, and modern TUI
-compatibility work. The application name and package identity intentionally
-remain **Term49C**, so existing installations can be upgraded in place instead
-of creating a second application.
+denotes this fork's extended feature set. The application is displayed as
+**Term49CX**, but it intentionally retains Term49C's package identity so an
+existing installation is upgraded in place instead of creating a duplicate.
 
 Term49CX is developed and tested on a BlackBerry Classic Q20 running BB10
 10.3.3. It preserves the physical keyboard, trackpad, belt-key, terminal, and
@@ -24,12 +25,13 @@ are welcome.
 Requires OS version >= 10.3.
 
 **Install note:** official BlackBerry signing/distribution is no longer
-practical. Today Term49C can only be **sideloaded on a rooted BlackBerry 10
+practical. Today Term49CX can only be **sideloaded on a rooted BlackBerry 10
 OS**. Unsigned bars will not install on a stock, non-rooted device.
 
 ## What Term49CX adds
 
-The current device-tested build is **1.0.12**. Compared with the Term49C fork,
+The current build is **1.0.13**; its functional baseline was device-tested in
+1.0.12, with 1.0.13 adding the Term49CX display name. Compared with Term49C,
 Term49CX adds or fixes:
 
 * **Native BB10 IME input:** press Meta+i to compose Chinese or other IME text

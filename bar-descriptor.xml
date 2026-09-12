@@ -43,8 +43,8 @@
        <asset path="Device-Release/Term49" entry="true" type="Qnx/Elf">Term49</asset>
     </configuration>
 
-    <name>Term49C</name>
-    <versionNumber>1.0.12</versionNumber>
+    <name>Term49CX</name>
+    <versionNumber>1.0.13</versionNumber>
     <buildId>1</buildId>
 
     <!-- May have multiple values for each language. See samples or xsd schema file. -->
