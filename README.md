@@ -110,6 +110,10 @@ licensed), instead of showing empty squares. Configure with
   to the terminal. When an application enables **bracketed paste**
   (DECSET 2004, e.g. vim, zsh, bash), the paste is wrapped so the
   application treats it as literal text rather than typed commands.
+* **System IME input (Q20)**: enter metamode (hold Space or tap the
+  top-left corner), then press `i`. A native BB10 text field opens; compose
+  Chinese or other IME text and press Send to write committed UTF-8 text
+  to the terminal.
 * **Remote clipboard (OSC 52)**: programs can set the phone's clipboard
   with an `OSC 52` escape — so `tmux` (`set -s set-clipboard on`), vim
   (`set clipboard=unnamed` with an OSC 52 plugin), and similar tools can

@@ -41,16 +41,16 @@
     </configuration>
 
     <name>Term49C</name>
-    <versionNumber>1.0.0</versionNumber>
+    <versionNumber>1.0.2</versionNumber>
     <buildId>1</buildId>
 
     <!-- May have multiple values for each language. See samples or xsd schema file. -->
     <description>The Term49 application</description>
 
     <!--  Must match the developer name of your developer certificate. -->
-    <author>Package-Author</author>
+    <author>Term49C Developers</author>
     <!--  Unique author ID assigned by signing authority. Required if using debug tokens. -->
-    <authorId>Package-Author-Id</authorId>
+    <authorId>testVGVybTUwIERldmVsb3BlcnM</authorId>
 
     <initialWindow>
       <autoOrients>true</autoOrients>

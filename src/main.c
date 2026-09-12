@@ -19,6 +19,7 @@
 #include <termios.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <sched.h>
 #include <sys/select.h>
@@ -27,6 +28,7 @@
 #include <bps/navigator.h>
 #include <bps/virtualkeyboard.h>
 #include <bps/deviceinfo.h>
+#include <bps/dialog.h>
 #include <unicode/utf.h>
 
 #include "SDL.h"
@@ -104,10 +106,76 @@ static pid_t child_pid = -1;
 
 static char virtualkeyboard_visible = 0;
 static char key_repeat_done = 0;
+static dialog_instance_t text_input_dialog = NULL;
 
 static SDL_mutex *input_mutex = NULL;
 
 static int event_pipe[2];
+
+/*
+ * Term49C normally consumes raw Screen keyboard events.  That is ideal for
+ * terminal control keys, but it bypasses the BB10 input method's composition
+ * stage.  A native prompt dialog gives Chinese/Japanese/etc. IMEs a real text
+ * field; once the user presses Send, feed the committed UTF-8 text into the
+ * PTY using the same Unicode path as paste and ordinary terminal input.
+ */
+static void show_text_input_dialog(void)
+{
+	if(text_input_dialog != NULL){
+		/* Reuse the same prompt instance.  Recreating a prompt after a
+		 * DIALOG_RESPONSE is unreliable on some BB10 10.3.3 builds. */
+		dialog_set_prompt_input_field(text_input_dialog, "");
+		dialog_show(text_input_dialog);
+		return;
+	}
+	if(dialog_create_prompt(&text_input_dialog) != BPS_SUCCESS){
+		text_input_dialog = NULL;
+		return;
+	}
+	dialog_set_title_text(text_input_dialog, "输入文字");
+	dialog_set_prompt_message_text(text_input_dialog, "使用系统输入法输入，发送后写入终端");
+	dialog_set_prompt_input_placeholder(text_input_dialog, "在这里输入中文");
+	dialog_set_prompt_input_field(text_input_dialog, "");
+	dialog_set_prompt_maximum_characters(text_input_dialog, 2048);
+	dialog_add_button(text_input_dialog, "取消", true, "cancel", true);
+	dialog_add_button(text_input_dialog, "发送", true, "send", true);
+	if(dialog_show(text_input_dialog) != BPS_SUCCESS){
+		dialog_destroy(text_input_dialog);
+		text_input_dialog = NULL;
+	}
+}
+
+static void handle_text_input_dialog_event(bps_event_t *event)
+{
+	const char *text;
+	size_t utf8_len;
+	ssize_t unicode_len;
+	UChar *unicode;
+
+	if(text_input_dialog == NULL ||
+	   dialog_event_get_dialog_instance(event) != text_input_dialog){
+		return;
+	}
+
+	if(dialog_event_get_selected_index(event) == 1){
+		text = dialog_event_get_prompt_input_field(event);
+		if(text != NULL && text[0] != '\0'){
+			utf8_len = strlen(text);
+			unicode = calloc(utf8_len + 1, sizeof(UChar));
+			if(unicode != NULL){
+				unicode_len = io_read_utf8_string(text, utf8_len, unicode);
+				if(unicode_len > 0){
+					buf_reset_view();
+					io_write_master(unicode, (size_t)unicode_len);
+				}
+				free(unicode);
+			}
+		}
+	}
+
+	/* Keep the instance alive and reuse it on the next Meta+i.  The dialog
+	 * service hides it after the response; it is destroyed during uninit. */
+}
 
 /* leftover touch-drag pixels not yet turned into scrolled lines */
 static int touch_scroll_acc = 0;
@@ -1060,6 +1128,13 @@ void handleKeyboardEvent(screen_event_t screen_event)
 		}
 
 		if(metamode && !metamode_just_set){
+			/* Meta+i opens a native BB10 text field so system IMEs can compose
+			 * Chinese text before it is committed to the terminal. */
+			if(screen_val == 'i' || screen_val == 'I'){
+				show_text_input_dialog();
+				metamode_toggle();
+				return;
+			}
 			/* metamode is shift-aware: with Shift held (or armed via the
 			 * sticky shift key), an uppercase binding wins if one exists,
 			 * and a key bound to Tab sends back-tab (CSI Z) instead */
@@ -1339,6 +1414,9 @@ static int sdl_init() {
 		PRINT(stderr, "Couldn't initialize SDL: %s\n",SDL_GetError());
 		return TERM_FAILURE;
 	}
+	if(dialog_request_events(0) != BPS_SUCCESS){
+		fprintf(stderr, "Could not request dialog events\n");
+	}
 	PRINT(stderr, "Post SDL_Init()\n");
 
 	SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
@@ -1435,6 +1513,12 @@ static int sdl_init() {
 }
 
 void uninit(){
+	if(text_input_dialog != NULL){
+		dialog_cancel(text_input_dialog);
+		dialog_destroy(text_input_dialog);
+		text_input_dialog = NULL;
+	}
+	dialog_stop_events(0);
 
 	buf_uninit();
 
@@ -2108,7 +2192,12 @@ int main(int argc, char **argv) {
 				bps_event_t* bps_event = event.syswm.msg->event;
 				int screene_type;
 				int domain = bps_event_get_domain(bps_event);
-				PRINT(stderr, "Unhandled SYSWMEVENT: %d\n", domain);
+				if(domain == dialog_get_domain() &&
+				   bps_event_get_code(bps_event) == DIALOG_RESPONSE){
+					handle_text_input_dialog_event(bps_event);
+				} else {
+					PRINT(stderr, "Unhandled SYSWMEVENT: %d\n", domain);
+				}
 			}
 			break;
 		case SDL_MOUSEBUTTONDOWN:
