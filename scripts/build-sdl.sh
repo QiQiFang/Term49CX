@@ -22,15 +22,29 @@ if [ -z "$TRIPLET" ]; then
 fi
 echo "Using toolchain triplet: $TRIPLET"
 
+# SDL 1.2 ships a 2009 config.guess that cannot identify current MSYS2.
+# Docker/Linux can keep auto-detection; native Windows builds need an explicit
+# build triplet so configure reaches the already-detected QNX cross compiler.
+BUILD_ARG=""
+case "$(uname -s)" in
+	MSYS*|MINGW*) BUILD_ARG="--build=x86_64-pc-mingw32" ;;
+esac
+
 CPPFLAGS="-D__PLAYBOOK__ -D__QNXNTO__ -DRAW_KEYBOARD_EVENTS -I$REPO_ROOT/TouchControlOverlay/public" \
 CFLAGS="-g -O2" \
 LDFLAGS="-L$REPO_ROOT/external/lib -lscreen -lbps -lasound -lm -lEGL -lGLESv2 -lTouchControlOverlay" \
-./configure --host="$TRIPLET" \
+./configure $BUILD_ARG --host="$TRIPLET" \
             --without-x \
             --enable-pthreads \
             --enable-video-playbook
 
-make -j"$(nproc)"
+# GNU make imported from the BB10 NDK inherits the Windows Git shell path.
+# Its space ("Program Files") is not quoted when make creates dependency
+# helper scripts, so force the stable MSYS path for native Windows builds.
+case "$(uname -s)" in
+	MSYS*|MINGW*) make SHELL=/usr/bin/sh -j"$(nproc)" ;;
+	*) make -j"$(nproc)" ;;
+esac
 
 # Do the final shared link ourselves so the library gets the exact name and
 # soname (libSDL12.so) that Term49 links against and bar-descriptor.xml ships.

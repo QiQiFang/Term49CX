@@ -35,6 +35,7 @@
 #include <bps/orientation.h>
 #include <bps/navigator.h>
 #include <bps/virtualkeyboard.h>
+#include <bps/dialog.h>
 #include "touchcontroloverlay.h"
 
 #include <errno.h>
@@ -898,6 +899,10 @@ void handleVirtualKeyboardEvent(_THIS, bps_event_t *event)
 extern void lock_input();
 extern void unlock_input();
 extern void indicate_event_input();
+/* Dialog response payloads are owned by BPS and become invalid as soon as
+ * bps_get_event() advances.  Dispatch them here instead of trying to wrap the
+ * pointer in a deferred SDL_SYSWMEVENT. */
+extern void handleDialogEvent(bps_event_t *event);
 void
 PLAYBOOK_PumpEvents(_THIS)
 {
@@ -914,6 +919,8 @@ PLAYBOOK_PumpEvents(_THIS)
 			handleScreenEvent(this, event);
 		} else if (domain == virtualkeyboard_get_domain()){
 			handleVirtualKeyboardEvent(this, event);
+		} else if (domain == dialog_get_domain()){
+			handleDialogEvent(event);
 		}
 		indicate_event_input();
 		unlock_input();

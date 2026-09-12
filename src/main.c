@@ -129,8 +129,9 @@ static void show_text_input_dialog(void)
 		/* Reuse the same prompt instance.  Recreating a prompt after a
 		 * DIALOG_RESPONSE is unreliable on some BB10 10.3.3 builds. */
 		dialog_set_prompt_input_field(text_input_dialog, "");
-		if(dialog_show(text_input_dialog) == BPS_SUCCESS){
-			text_input_active = 1;
+		text_input_active = 1;
+		if(dialog_show(text_input_dialog) != BPS_SUCCESS){
+			text_input_active = 0;
 		}
 		return;
 	}
@@ -147,15 +148,15 @@ static void show_text_input_dialog(void)
 	dialog_add_button(text_input_dialog, "发送", true, "send", true);
 	dialog_set_default_button_index(text_input_dialog, 1);
 	dialog_set_enter_key_type(text_input_dialog, VIRTUALKEYBOARD_ENTER_SEND);
+	text_input_active = 1;
 	if(dialog_show(text_input_dialog) != BPS_SUCCESS){
+		text_input_active = 0;
 		dialog_destroy(text_input_dialog);
 		text_input_dialog = NULL;
-	} else {
-		text_input_active = 1;
 	}
 }
 
-static void handle_text_input_dialog_event(bps_event_t *event)
+void handleDialogEvent(bps_event_t *event)
 {
 	const char *text;
 	const char *context;
@@ -2205,7 +2206,7 @@ int main(int argc, char **argv) {
 				int domain = bps_event_get_domain(bps_event);
 				if(domain == dialog_get_domain() &&
 				   bps_event_get_code(bps_event) == DIALOG_RESPONSE){
-					handle_text_input_dialog_event(bps_event);
+					handleDialogEvent(bps_event);
 				} else {
 					PRINT(stderr, "Unhandled SYSWMEVENT: %d\n", domain);
 				}
