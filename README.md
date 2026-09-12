@@ -1,259 +1,100 @@
 # Term49CX
 
-**Term49CX** is based on
-[jxw1102/Term49C](https://github.com/jxw1102/Term49C), a native terminal
-emulator for BlackBerry 10. It keeps Term49C's design and usage model while
-adding device-tested input, Unicode, rendering, and modern TUI compatibility
-improvements. The project lineage is:
+Term49CX is an enhanced fork of
+[jxw1102/Term49C](https://github.com/jxw1102/Term49C) for BlackBerry 10,
+developed and tested on the BlackBerry Classic Q20.
 
-> Term48 → Term49 → Term49C → Term49CX
+The project lineage is:
 
-The **C** retains the BlackBerry **Classic** focus of Term49C, while **X**
-denotes this fork's extended feature set. The application is displayed as
-**Term49CX**, but it intentionally retains Term49C's package identity so an
-existing installation is upgraded in place instead of creating a duplicate.
+> [Term48](https://github.com/mordak/Term48) →
+> [Term49](https://github.com/BerryFarm/Term49) →
+> [Term49C](https://github.com/jxw1102/Term49C) → Term49CX
 
-Term49CX is developed and tested on a BlackBerry Classic Q20 running BB10
-10.3.3. It preserves the physical keyboard, trackpad, belt-key, terminal, and
-scrollback behavior inherited from Term49C.
+The **C** retains the BlackBerry **Classic** focus of Term49C. The **X**
+represents the extended input, Unicode, rendering, and modern TUI compatibility
+implemented by this fork.
 
-It implements (relevant parts of) the [ECMA-48 standard][ecma], plus extra
-control sequences for the `xterm-256color` terminfo. It is a work in progress,
-but good enough for daily use. Pull requests, feature requests, and bug reports
-are welcome.
+For the original terminal features, keyboard controls, trackpad behavior,
+configuration, and build background, see the
+[Term49C README](https://github.com/jxw1102/Term49C#readme). This document only
+describes the changes made by Term49CX.
 
-Requires OS version >= 10.3.
+## Term49CX changes
 
-**Install note:** official BlackBerry signing/distribution is no longer
-practical. Today Term49CX can only be **sideloaded on a rooted BlackBerry 10
-OS**. Unsigned bars will not install on a stock, non-rooted device.
+### Native BB10 IME input
 
-## What Term49CX adds
+Press **Meta+i** (hold Space to enter Meta mode, then press `i`) to open a
+native BB10 text field. Chinese and other IME text can be composed with the
+system input method and submitted with physical Enter or the Send button.
 
-The current build is **1.0.13**; its functional baseline was device-tested in
-1.0.12, with 1.0.13 adding the Term49CX display name. Compared with Term49C,
-Term49CX adds or fixes:
+Term49CX reuses the native dialog reliably, routes its response through the
+SDL/BPS event pump, and prevents composition keystrokes from leaking into the
+shell or a full-screen TUI. Virtual-keyboard resize events and trailing input
+after dismissal are also isolated.
 
-* **Native BB10 IME input:** press Meta+i to compose Chinese or other IME text
-  in a reusable system dialog, then submit it with physical Enter or Send.
-* **Reliable long IME submissions:** text is converted and written using a
-  dynamically sized buffer rather than the original 40-byte key buffer, so
-  longer Chinese messages are not truncated after roughly 13 characters.
-* **Input isolation:** keys used for IME composition do not leak into the shell
-  or the TUI running behind the dialog, and dismissing the dialog does not lock
-  further terminal input.
-* **CJK and wide-character layout:** double-width cells remain aligned while
-  displaying Chinese and other East Asian text.
-* **Monochrome emoji:** supplementary-plane emoji are rendered through a
-  bundled Noto Emoji font. Because the Q20's legacy FreeType/SDL_ttf stack does
-  not reliably consume cmap format 12, supported U+1F000–U+1FAFF glyphs are
-  mirrored into the BMP Private Use Area and rendered through the proven
-  UTF-16 path.
-* **Modern TUI rendering:** DEC synchronized-output mode 2026 avoids visible
-  intermediate redraws and scrolling when compatible applications repaint a
-  frame.
-* **Terminal usability:** trackpad navigation and mouse reporting, touch and
-  Alt+trackpad scrolling, copy/paste and OSC 52 clipboard support, fallback
-  glyphs, DEC line drawing, Shift+Tab, and cursor-style handling.
+### Long text submission
 
-The source commits and device validation history are kept in Git so regressions
-in the legacy BB10 graphics and input stack can be traced independently.
+Term49C's small key-event buffer truncated UTF-8 IME submissions after roughly
+13 Chinese characters. Term49CX dynamically sizes long PTY writes, allowing the
+native input dialog to submit substantially longer messages without truncation.
 
-## Trackpad support (BlackBerry Classic / Q20)
+### CJK and wide-character rendering
 
-On devices with a trackpad, swiping the trackpad sends arrow keys (useful
-for shell history and cursor movement, since the Classic has no arrow
-keys), and clicking the trackpad sends Enter. Application cursor key mode
-(DECCKM) is respected, so arrows also work in `vi`, `less`, etc.
+The terminal buffer tracks East Asian wide and full-width characters as two
+cells so Chinese text and following terminal columns remain aligned.
 
-Three settings in `~/.term49rc` control this behaviour:
+### Monochrome emoji on the Q20
 
-* `trackpad_enabled` (default `true`): set to `false` to ignore the trackpad.
-* `trackpad_sensitivity` (default `60`): trackpad displacement counts per
-  arrow keystroke. Lower values mean more keystrokes per swipe.
-* `trackpad_click_keys` (default `"kent"`, i.e. Enter): keystrokes sent on
-  trackpad click. Accepts the same values as other keymaps, including
-  terminfo names such as `"kcuu1"`; set to `""` to disable the click.
+Term49CX adds supplementary-plane Unicode handling and a bundled monochrome
+Noto Emoji fallback font.
 
-The trackpad arrives at the app as raw `SCREEN_EVENT_JOYSTICK` events via a
-patched libSDL (see `patches/sdl-term48-trackpad.patch`, already applied to
-the prebuilt `external/lib/libSDL12.so`).
+The Q20's legacy FreeType/SDL_ttf stack does not reliably render cmap format 12.
+To remain compatible, supported glyphs in U+1F000–U+1FAFF are mirrored into the
+BMP Private Use Area and rendered through the device-tested UTF-16 path. The
+compatibility font can be regenerated with `scripts/Build-Q20EmojiFont.py` from
+the parent Q20 workspace.
 
-## Belt keys (BlackBerry Classic / Q20)
+### Modern TUI redraw compatibility
 
-* **Back** sends Esc. Configurable via `back_button_keys` in `~/.term49rc`
-  (default `"\x1b"`; accepts the same values as other keymaps, e.g.
-  terminfo names).
-* **Menu (BlackBerry key)** toggles a persistent Alt mode: every key maps
-  through the alt table (and Alt+trackpad scrolling is armed) until you
-  press Menu again. The `a` indicator shows while it is active. This is
-  different from the hardware Alt key, which stays one-shot. The
-  swipe-down-from-bezel gesture does the same.
-* Send and End keep their system behaviour.
+DEC synchronized-output mode 2026 is supported. Applications can bracket a
+frame with `CSI ? 2026 h` and `CSI ? 2026 l`; Term49CX defers intermediate
+paints until the frame completes, reducing visible scrolling and partial redraws
+in modern full-screen terminal interfaces. A safety timeout prevents a malformed
+or interrupted frame from freezing the display.
 
-## Shift+Tab (back-tab)
+### Additional terminal fixes
 
-Key tables are shift-aware. With Shift active — held down, or armed via
-the sticky shift key (`↑` indicator) — any metamode, sym-menu, or alt
-key bound to Tab sends back-tab (`ESC [ Z`) instead, i.e. Shift+Tab.
-So: arm Shift, then arm metamode (hold Space, or tap the top-left
-corner), then `t` (the default Tab binding) — or arm Shift and pick
-Tab from the sym menu.
+Term49CX also includes the related compatibility work developed alongside these
+features:
 
-**Note:** the optional double-tap right-Shift metamode toggle does
-**not** work on BlackBerry Classic (Q20); the keyboard does not
-report a distinct right-Shift event. Use hold-Space or the corner
-hitbox on Classic.
+* reusable system IME invocation;
+* physical Enter submission from the native input dialog;
+* correct UTF-8 delivery to the PTY;
+* CJK font fallback and double-width cell alignment;
+* supplementary-plane-safe copy handling;
+* fallback glyph rendering for modern terminal symbols;
+* OSC 52 clipboard support;
+* bracketed paste support;
+* touch selection and scrollback improvements;
+* xterm mouse reporting and cursor-style handling;
+* DEC Special Graphics line drawing and Shift+Tab behavior.
 
-For custom shifted bindings, an uppercase entry in `metamode_keys` wins
-when Shift is active, e.g. `("T", "...")` alongside `("t", "\x09")`.
-Shift+Tab from the virtual keyboard also sends back-tab.
+## Compatibility and installation
 
-## Mouse support
+Term49CX requires BlackBerry OS 10.3 or later. The current device-tested feature
+baseline is version **1.0.12**; version **1.0.13** changes the displayed
+application name to Term49CX while retaining Term49C's package ID so an existing
+installation is upgraded in place and keeps its configuration.
 
-Term49C implements xterm mouse reporting (DECSET 9/1000/1002/1003, plus
-SGR 1006 coordinates). When an application enables mouse tracking (tmux
-with `set -g mouse on`, vim with `set mouse=a`, htop, mc, ...):
+Official BlackBerry signing and distribution are no longer practical. Current
+builds are unsigned BAR packages and require a BB10 system configured to accept
+unsigned applications. A stock, non-rooted device will reject the package.
 
-* the **trackpad** automatically switches from arrow keys to driving a
-  mouse pointer (shown as an inverse `+`); trackpad click = left click.
-  When the application turns mouse tracking off, the trackpad reverts to
-  arrow keys — there is nothing to configure.
-* **touching the screen** sends a click at the touched cell, and dragging
-  reports mouse motion (e.g. selecting text in vim).
-* **Alt + trackpad** swipes send wheel events (apps treat these as
-  scrolling) instead of using the local scrollback.
+## Upstream and licenses
 
-Line drawing also works: SI/SO and the SCS charset designations
-(`ESC ( 0` / `ESC ( B`) are honoured and DEC Special Graphics characters
-are mapped to Unicode box-drawing glyphs, so ncurses borders and
-separators render as real lines instead of letters.
+Term49CX is based on [jxw1102/Term49C](https://github.com/jxw1102/Term49C) and
+retains its original licensing terms and upstream history. Bundled fallback
+fonts retain their respective license files in `external/fonts`.
 
-## Fallback font
-
-The default terminal font may lack glyphs modern TUI programs draw with:
-braille patterns, rounded box corners, block elements, powerline symbols.
-Characters the main font cannot draw are rendered with a bundled fallback
-font ([Cascadia Mono](https://github.com/microsoft/cascadia-code), OFL
-licensed), instead of showing empty squares. Configure with
-`fallback_font_path` in `~/.term49rc` (set to `""` to disable).
-
-## Copy and paste
-
-* **Copy**: hold Alt (or turn on Menu's persistent Alt mode), then drag a
-  finger across the screen to select text. Selected cells are highlighted;
-  lifting your finger copies the text to the system clipboard (trailing
-  spaces trimmed, rows joined with newlines). A plain tap clears the
-  selection.
-* **Paste**: the existing paste action (metamode `v`) writes the clipboard
-  to the terminal. When an application enables **bracketed paste**
-  (DECSET 2004, e.g. vim, zsh, bash), the paste is wrapped so the
-  application treats it as literal text rather than typed commands.
-* **System IME input (Q20)**: enter metamode (hold Space or tap the
-  top-left corner), then press `i`. A native BB10 text field opens; compose
-  Chinese or other IME text and press the physical Enter key (or tap Send)
-  to write committed UTF-8 text to the terminal. While the prompt is open,
-  hardware keystrokes are isolated from the terminal so composition keys do
-  not leak into shells or full-screen TUI applications. Dialog responses are
-  consumed synchronously in the SDL/BPS event pump, before their BPS payload
-  becomes invalid. Virtual-keyboard candidate/height notifications are also
-  isolated, preventing each IME update (and dialog dismissal) from resizing
-  or snapping the terminal view, and trailing dismissal input is swallowed.
-* **Remote clipboard (OSC 52)**: programs can set the phone's clipboard
-  with an `OSC 52` escape — so `tmux` (`set -s set-clipboard on`), vim
-  (`set clipboard=unnamed` with an OSC 52 plugin), and similar tools can
-  copy to the BlackBerry clipboard even over SSH. Clipboard *reads* via
-  OSC 52 are ignored for privacy.
-* **Synchronized output (DEC mode 2026)**: modern full-screen TUIs can wrap a
-  frame in `CSI ? 2026 h` / `CSI ? 2026 l`. Term49C defers intermediate
-  paints until the frame closes, avoiding partial-screen scrolling/flicker;
-  a one-second safety timeout prevents a malformed sequence from freezing
-  the display.
-
-## Cursor styles
-
-Term49C honours `DECSCUSR` (`CSI Ps SP q`): applications can request a
-block, underline, or bar cursor (vim, for example, uses this to show
-insert vs normal mode). Blinking variants render steady.
-
-## Scrollback
-
-Term49C keeps scrollback history (`scrollback_lines` in `~/.term49rc`,
-default `500` extra lines; `0` disables). To scroll:
-
-* **Touch**: drag a finger up/down on the screen — the content follows
-  your finger.
-* **Alt + trackpad**: press Alt (sticky), then swipe the trackpad up/down.
-  Press Alt again to leave scroll mode.
-
-While scrolled back, an inverse `▲` shows in the top-right corner, and the
-view stays anchored even as new output arrives. Typing (or sending arrows
-with the trackpad) snaps back to the live screen. Full-screen applications
-(`less`, `vim`, ...) use the alternate screen and are unaffected.
-
-## Development
-
-To compile Term49C you will need:
-
-* [libSDL][libsdl]
-* [Touch Control Overlay][tco]
-* [libconfig][libconfig]
-
-Prebuilt shared libraries are available in `external/lib` (see Makefile). To
-build them from source, check out the submodules (`git clone --recursive`) and
-build with the Momentics IDE. When compiling SDL, define
-`-D__PLAYBOOK__ -DRAW_KEYBOARD_EVENTS`.
-
-**Deployment:** there is no supported signing path for BlackBerry World or
-stock devices anymore. Build an unsigned bar and **sideload it onto a rooted
-BB10 OS** (for example with community tools such as
-[bb10d](https://github.com/jxw1102) / device-side package installers). Stock,
-non-rooted devices will reject the package.
-
-### Building with Docker
-
-If you don't have (or can't install) the BlackBerry NDK locally, you can
-build with Docker using a community BB10 NDK 10.3.1 image:
-
-* `./scripts/docker-build.sh` — builds `Device-Debug/Term49` and packages an
-  unsigned `Term49C.bar`
-* `./scripts/docker-build.sh sdl` — additionally rebuilds the patched
-  `external/lib/libSDL12.so` from the `SDL` tree (`term48` branch plus
-  `patches/sdl-term48-trackpad.patch`)
-
-The image (`delaya73/bbndk` by default, override with `BBNDK_IMAGE`) runs
-under x86 emulation on arm64 hosts, which is slow but works. By using the
-NDK you accept the BlackBerry SDK license. Sideload the resulting
-`Term49C.bar` on a rooted device — do not expect stock install or store
-signing to work.
-
-### Building locally
-
-You can build Term49C without Momentics:
-
-* Load the proper `bbndk-env` file
-* `make` — produces the binary under `Device-Debug/`
-* Package with the Docker/container scripts, or your own `blackberry-nativepackager` invocation, to get `Term49C.bar`
-* Sideload the bar on a **rooted** BB10 device
-
-### Debugging with GDB
-
-On a rooted device with a working SSH/debug channel:
-
-* Load `bbndk-env` on the host
-* Deploy and launch the app stopped if your tooling supports it
-* Attach `ntoarm-gdb` to the process on the device
-
-Exact steps depend on your root/debug setup; the historical Momentics
-debug-token + `blackberry-connect` signing flow is no longer documented here.
-
-## See also
-
-* [BerryFarm Term49](https://github.com/BerryFarm/Term49) (upstream)
-* [Term48](https://github.com/mordak/Term48) (original)
-* [Term48 on BlackBerry AppWorld](http://appworld.blackberry.com/webstore/content/26272878/) (historical)
-
-[ecma]: http://www.ecma-international.org/publications/standards/Ecma-048.htm
-[libsdl]: https://github.com/mordak/SDL/tree/term48
-[tco]: https://github.com/blackberry/TouchControlOverlay
-[libconfig]: http://www.hyperrealm.com/libconfig/
+Please report Term49CX-specific issues in this repository. For behavior inherited
+unchanged from Term49C, consult the upstream project first.
