@@ -640,6 +640,18 @@ struct glyph_entry {
 };
 static struct glyph_entry glyph_cache[GLYPH_CACHE_SLOTS];
 
+/* The legacy Q20 SDL_ttf build reliably renders BMP text through its UTF-16
+ * string path. Its single-glyph path produces blank ordinary terminal text
+ * on-device, so reserve that path for non-BMP code points. */
+static SDL_Surface* render_char_shaded(TTF_Font* rfont, UChar32 c,
+		SDL_Color fg, SDL_Color bg){
+	if(c <= 0xffff){
+		UChar str[2] = {(UChar)c, 0};
+		return TTF_RenderUNICODE_Shaded(rfont, str, fg, bg);
+	}
+	return TTF_RenderGlyph_Shaded(rfont, c, fg, bg);
+}
+
 static Uint32 pack_color(SDL_Color c){
 	return ((Uint32)c.r << 16) | ((Uint32)c.g << 8) | (Uint32)c.b;
 }
@@ -680,7 +692,7 @@ static SDL_Surface* glyph_render(UChar32 c, int style, SDL_Color fg, SDL_Color b
 		/* empty slot: rasterise into it */
 		rfont = font_for_char(c);
 		TTF_SetFontStyle(rfont, style);
-		e->surface = TTF_RenderGlyph_Shaded(rfont, c, fg, bg);
+		e->surface = render_char_shaded(rfont, c, fg, bg);
 		if(e->surface == NULL){
 			*shared = 1;
 			return NULL;
@@ -698,7 +710,7 @@ static SDL_Surface* glyph_render(UChar32 c, int style, SDL_Color fg, SDL_Color b
 	rfont = font_for_char(c);
 	TTF_SetFontStyle(rfont, style);
 	*shared = 0;
-	return TTF_RenderGlyph_Shaded(rfont, c, fg, bg);
+	return render_char_shaded(rfont, c, fg, bg);
 }
 
 void font_uninit(){
@@ -1790,9 +1802,9 @@ void render() {
 			TTF_Font *rfont = font_for_char(sc->c);
 			TTF_SetFontStyle(rfont, sc->style.style);
 			if(buf->inverse_video){
-				inv_cursor = TTF_RenderGlyph_Shaded(rfont, sc->c, adjust_color(sc->style.fg_color, sc->style), sc->style.bg_color);
+				inv_cursor = render_char_shaded(rfont, sc->c, adjust_color(sc->style.fg_color, sc->style), sc->style.bg_color);
 			} else {
-				inv_cursor = TTF_RenderGlyph_Shaded(rfont, sc->c, adjust_color(sc->style.bg_color, sc->style), sc->style.fg_color);
+				inv_cursor = render_char_shaded(rfont, sc->c, adjust_color(sc->style.bg_color, sc->style), sc->style.fg_color);
 			}
 			if(inv_cursor == NULL){
 				PRINT(stderr, "Rendering failed for char %d\n", (int)sc->c);
