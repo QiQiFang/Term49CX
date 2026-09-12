@@ -35,7 +35,7 @@ LDOPTS    	:= -Wl,-z,relro -Wl,-z,now
 
 ASSET      	:= Device-Debug
 BINARY     	:= Term49
-BAR        	:= Term49C.bar
+BAR        	:= Term49CX.bar
 BINARY_PATH	:= $(ASSET)/$(BINARY)
 
 SRCS := $(wildcard src/*.c)

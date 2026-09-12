@@ -1,7 +1,7 @@
 #!/bin/bash
 # Runs inside the bbndk Docker container (see docker-build.sh).
 # Builds Term49 into Device-Debug/Term49 and packages an unsigned
-# Term49C.bar. With the "sdl" argument, first rebuilds the patched
+# Term49CX.bar. With the "sdl" argument, first rebuilds the patched
 # libSDL12.so from the SDL submodule (term48 branch +
 # patches/sdl-term48-trackpad.patch) into external/lib/.
 
@@ -27,7 +27,7 @@ echo "=== Building Term49 ==="
 make clean >/dev/null 2>&1 || true
 make Term49
 
-echo "=== Packaging unsigned Term49C.bar (case-sensitive staging) ==="
+echo "=== Packaging unsigned Term49CX.bar (case-sensitive staging) ==="
 # The terminfo tree contains case-colliding directories (x/ and X/, e/ and
 # E/, ...). On a macOS (case-insensitive) checkout these merge, silently
 # shipping a bar whose terminfo is missing half its directories - lookups
@@ -70,8 +70,8 @@ done
 # Note: no -devMode here - it stamps Development-Mode into the manifest,
 # which makes installs fail unless the bar author matches the device's
 # debug token.
-(cd "$STAGE" && blackberry-nativepackager -package Term49C.bar bar-descriptor.xml -configuration Device-Debug) || true
-[ -f "$STAGE/Term49C.bar" ] || { echo "packaging failed"; exit 1; }
-cp "$STAGE/Term49C.bar" .
+(cd "$STAGE" && blackberry-nativepackager -package Term49CX.bar bar-descriptor.xml -configuration Device-Debug) || true
+[ -f "$STAGE/Term49CX.bar" ] || { echo "packaging failed"; exit 1; }
+cp "$STAGE/Term49CX.bar" .
 
-echo "=== Done: Device-Debug/Term49 and Term49C.bar ==="
+echo "=== Done: Device-Debug/Term49 and Term49CX.bar ==="
