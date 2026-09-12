@@ -583,12 +583,18 @@ int font_init(int font_size){
 		}
 	}
 
-	/* Keep supplementary-plane layout enabled, but do not open the bundled
-	 * Noto Emoji face here.  The Q20's old FreeType stack can stall while
-	 * loading that modern font, leaving the application on a black screen.
-	 * A converted legacy-compatible face can be re-enabled after device
-	 * validation. */
-	emoji_font = NULL;
+	/* Bundled monochrome outlines for supplementary-plane emoji.  Ordinary
+	 * BMP text remains on the Q20-tested UTF-16 string rendering path; only
+	 * non-BMP glyphs use the widened single-glyph path below. */
+	emoji_font = TTF_OpenFont("../app/native/fonts/NotoEmoji-Regular.ttf", font_size);
+	if(emoji_font != NULL){
+		TTF_SetFontStyle(emoji_font, TTF_STYLE_NORMAL);
+		TTF_SetFontOutline(emoji_font, 0);
+		TTF_SetFontKerning(emoji_font, 0);
+		TTF_SetFontHinting(emoji_font, TTF_HINTING_NORMAL);
+	} else {
+		fprintf(stderr, "No monochrome emoji font: %s\n", SDL_GetError());
+	}
 
 	return TERM_SUCCESS;
 }
