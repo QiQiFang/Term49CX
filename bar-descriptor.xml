@@ -41,7 +41,7 @@
     </configuration>
 
     <name>Term49C</name>
-    <versionNumber>1.0.2</versionNumber>
+    <versionNumber>1.0.3</versionNumber>
     <buildId>1</buildId>
 
     <!-- May have multiple values for each language. See samples or xsd schema file. -->

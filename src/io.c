@@ -223,6 +223,40 @@ ssize_t io_read_utf8_string(const char* utf8, size_t utf8len, UChar* buf){
   return (ssize_t)(target - buf);
 }
 
+/* Convert one complete UTF-8 string to the configured terminal encoding and
+ * write it to the PTY.  Dialog responses are already UTF-8; resetting both
+ * converters here prevents an earlier malformed sequence from poisoning a
+ * later IME submission through ICU's sticky UErrorCode/state. */
+ssize_t io_write_utf8_string(const char* utf8, size_t utf8len){
+  UChar* unicode;
+  ssize_t unicode_len;
+  ssize_t written = -1;
+
+  if(utf8 == NULL || utf8len == 0){
+    return 0;
+  }
+
+  unicode = calloc(utf8len + 1, sizeof(UChar));
+  if(unicode == NULL){
+    return -1;
+  }
+
+  utf8_conv_err = U_ZERO_ERROR;
+  ucnv_resetToUnicode(utf8_conv);
+  unicode_len = io_read_utf8_string(utf8, utf8len, unicode);
+  if(U_SUCCESS(utf8_conv_err) && unicode_len > 0){
+    tty_conv_err = U_ZERO_ERROR;
+    ucnv_resetFromUnicode(tty_conv);
+    written = io_write_master(unicode, (size_t)unicode_len);
+  } else {
+    fprintf(stderr, "Could not convert IME text from UTF-8: %s\n",
+            u_errorName(utf8_conv_err));
+  }
+
+  free(unicode);
+  return written;
+}
+
 void io_paste_from_clipboard(){
   char* buffer = NULL;
   int ret;

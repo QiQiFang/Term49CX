@@ -107,6 +107,10 @@ static pid_t child_pid = -1;
 static char virtualkeyboard_visible = 0;
 static char key_repeat_done = 0;
 static dialog_instance_t text_input_dialog = NULL;
+/* While the native prompt owns keyboard focus, Screen still mirrors hardware
+ * key events to SDL.  Suppress those events so IME composition cannot leak
+ * j/k/etc. into the terminal or a full-screen TUI. */
+static char text_input_active = 0;
 
 static SDL_mutex *input_mutex = NULL;
 
@@ -125,7 +129,9 @@ static void show_text_input_dialog(void)
 		/* Reuse the same prompt instance.  Recreating a prompt after a
 		 * DIALOG_RESPONSE is unreliable on some BB10 10.3.3 builds. */
 		dialog_set_prompt_input_field(text_input_dialog, "");
-		dialog_show(text_input_dialog);
+		if(dialog_show(text_input_dialog) == BPS_SUCCESS){
+			text_input_active = 1;
+		}
 		return;
 	}
 	if(dialog_create_prompt(&text_input_dialog) != BPS_SUCCESS){
@@ -139,37 +145,35 @@ static void show_text_input_dialog(void)
 	dialog_set_prompt_maximum_characters(text_input_dialog, 2048);
 	dialog_add_button(text_input_dialog, "取消", true, "cancel", true);
 	dialog_add_button(text_input_dialog, "发送", true, "send", true);
+	dialog_set_default_button_index(text_input_dialog, 1);
+	dialog_set_enter_key_type(text_input_dialog, VIRTUALKEYBOARD_ENTER_SEND);
 	if(dialog_show(text_input_dialog) != BPS_SUCCESS){
 		dialog_destroy(text_input_dialog);
 		text_input_dialog = NULL;
+	} else {
+		text_input_active = 1;
 	}
 }
 
 static void handle_text_input_dialog_event(bps_event_t *event)
 {
 	const char *text;
-	size_t utf8_len;
-	ssize_t unicode_len;
-	UChar *unicode;
+	const char *context;
 
 	if(text_input_dialog == NULL ||
 	   dialog_event_get_dialog_instance(event) != text_input_dialog){
 		return;
 	}
 
-	if(dialog_event_get_selected_index(event) == 1){
+	/* A hardware Enter actions the default Send button.  Prefer its stable
+	 * context over visual/index ordering, which can vary with locale. */
+	context = dialog_event_get_selected_context(event);
+	text_input_active = 0;
+	if(context != NULL && strcmp(context, "send") == 0){
 		text = dialog_event_get_prompt_input_field(event);
 		if(text != NULL && text[0] != '\0'){
-			utf8_len = strlen(text);
-			unicode = calloc(utf8_len + 1, sizeof(UChar));
-			if(unicode != NULL){
-				unicode_len = io_read_utf8_string(text, utf8_len, unicode);
-				if(unicode_len > 0){
-					buf_reset_view();
-					io_write_master(unicode, (size_t)unicode_len);
-				}
-				free(unicode);
-			}
+			buf_reset_view();
+			io_write_utf8_string(text, strlen(text));
 		}
 	}
 
@@ -995,6 +999,10 @@ void handleKeyboardEvent(screen_event_t screen_event)
 	int32_t bs_i = 0;
 	size_t upcase_len = 0;
 	UChar backspace = 0x8;
+
+	if(text_input_active){
+		return;
+	}
 
 	screen_get_event_property_iv(screen_event, SCREEN_PROPERTY_KEY_FLAGS, &screen_flags);
 	screen_get_event_property_iv(screen_event, SCREEN_PROPERTY_KEY_SYM, &screen_val);
@@ -2180,6 +2188,9 @@ int main(int argc, char **argv) {
 			break;
 		case SDL_KEYDOWN:
 			{
+				if(text_input_active){
+					break;
+				}
 				fprintf(stderr, "SDL_KEYDOWN\n");
 				UChar uc;
 				char sdlkey = event.key.keysym.sym;

@@ -27,6 +27,7 @@ ssize_t io_write_master_char(const char *buf, size_t n);
 ssize_t io_read_master(UChar *buf, size_t nUChar);
 /* output is stored in the UChar buf, which must be of size utf8len */
 ssize_t io_read_utf8_string(const char* utf8, size_t utf8len, UChar* buf);
+ssize_t io_write_utf8_string(const char* utf8, size_t utf8len);
 void io_paste_from_clipboard();
 void io_copy_to_clipboard(const UChar* text, int len);
 void io_set_clipboard_bytes(const char* data, int len);
