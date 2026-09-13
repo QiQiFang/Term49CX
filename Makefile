@@ -3,6 +3,8 @@ CC := qcc
 INCLUDE := -I$(QNX_TARGET)/usr/include
 INCLUDE += -I$(QNX_TARGET)/usr/include/freetype2
 INCLUDE += -I./external/include
+QT4LIB := $(QNX_TARGET)/armle-v7/usr/lib/qt4/lib
+QTINCLUDE := -I$(QNX_TARGET)/usr/include/qt4 -I$(QNX_TARGET)/usr/include/qt4/QtCore
 
 # BB10 libraries
 LIBPATHS	:= -L$(QNX_TARGET)/armle-v7/lib
@@ -18,6 +20,8 @@ LIBPATHS += -L$(QNX_TARGET)/armle-v7/usr/lib
 # Include bundles libs
 LIBPATHS += -L./external/lib
 LIBS     += -lconfig -lSDL12 -lTouchControlOverlay
+LIBPATHS += -L$(QT4LIB) -Wl,-rpath-link,$(QT4LIB)
+LIBS     += -lbbsystem -lQtDeclarative -lQtGui -lQtCore
 
 # Optimised by default, and without DEBUGMSGS: with it defined, PRINT()
 # expands to fprintf, and ecma48_filter_text() logs *every character* of
@@ -30,6 +34,7 @@ DEBUGFLAGS	?= -O2 -g
 # qcc target: works with both NDK 10.2 (gcc 4.6.3) and 10.3.1 (gcc 4.8.3)
 QCC_TARGET	?= gcc_ntoarmv7le
 CFLAGS    	:= $(INCLUDE) -V$(QCC_TARGET) -Wc,-std=gnu99 $(DEBUGFLAGS)
+CXXFLAGS  	:= $(INCLUDE) $(QTINCLUDE) -V$(QCC_TARGET) -lang-c++ -Wc,-std=gnu++98 $(DEBUGFLAGS)
 LDFLAGS   	:= $(LIBPATHS) $(LIBS)
 LDOPTS    	:= -Wl,-z,relro -Wl,-z,now
 
@@ -39,7 +44,8 @@ BAR        	:= Term49CX.bar
 BINARY_PATH	:= $(ASSET)/$(BINARY)
 
 SRCS := $(wildcard src/*.c)
-OBJS := $(SRCS:.c=.o )
+CPPSRCS := $(wildcard src/*.cpp)
+OBJS := $(SRCS:.c=.o) $(CPPSRCS:.cpp=.o)
 
 include ./signing/bbpass
 
@@ -49,10 +55,13 @@ all: package-debug
 
 $(BINARY): $(OBJS)
 	mkdir -p $(ASSET)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(LDOPTS) $(OBJS) -o $(BINARY_PATH)
+	$(CC) $(CXXFLAGS) $(LDFLAGS) $(LDOPTS) $(OBJS) -o $(BINARY_PATH)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $(DEFINES) $< -o $@
+
+%.o: %.cpp
+	$(CC) $(CXXFLAGS) -c $(DEFINES) $< -o $@
 
 clean:
 	@rm -fv src/*.o

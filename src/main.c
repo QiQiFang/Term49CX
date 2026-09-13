@@ -43,6 +43,7 @@
 #include "buffer.h"
 #include "io.h"
 #include "colors.h"
+#include "system_prompt.h"
 
 static int exit_application = 0;
 
@@ -107,7 +108,6 @@ static pid_t child_pid = -1;
 
 static char virtualkeyboard_visible = 0;
 static char key_repeat_done = 0;
-static dialog_instance_t text_input_dialog = NULL;
 /* While the native prompt owns keyboard focus, Screen still mirrors hardware
  * key events to SDL.  Suppress those events so IME composition cannot leak
  * j/k/etc. into the terminal or a full-screen TUI. */
@@ -124,78 +124,35 @@ static SDL_mutex *input_mutex = NULL;
 static int event_pipe[2];
 
 /*
- * Term49C normally consumes raw Screen keyboard events.  That is ideal for
- * terminal control keys, but it bypasses the BB10 input method's composition
- * stage.  A native prompt dialog gives Chinese/Japanese/etc. IMEs a real text
- * field; once the user presses Send, feed the committed UTF-8 text into the
- * PTY using the same Unicode path as paste and ordinary terminal input.
+ * Screen keyboard events bypass the BB10 input method's composition stage.
+ * SystemPrompt provides a native text field and a semantic Cancel button.
+ * Its Qt event loop runs while SDL's BPS pump is paused, so a result is
+ * obtained before terminal input is unblocked. Only Send writes to the PTY.
  */
 static void show_text_input_dialog(void)
 {
-	if(text_input_dialog != NULL){
-		/* Reuse the same prompt instance.  Recreating a prompt after a
-		 * DIALOG_RESPONSE is unreliable on some BB10 10.3.3 builds. */
-		dialog_set_prompt_input_field(text_input_dialog, "");
-		text_input_active = 1;
-		text_input_vkb_suppressed = 1;
-		if(dialog_show(text_input_dialog) != BPS_SUCCESS){
-			text_input_active = 0;
-			text_input_vkb_suppressed = 0;
-		}
-		return;
-	}
-	if(dialog_create_prompt(&text_input_dialog) != BPS_SUCCESS){
-		text_input_dialog = NULL;
-		return;
-	}
-	dialog_set_title_text(text_input_dialog, "Enter text");
-	dialog_set_prompt_message_text(text_input_dialog, "Use the system input method, then tap Send to enter text in the terminal.");
-	dialog_set_prompt_input_placeholder(text_input_dialog, "Type here");
-	dialog_set_prompt_input_field(text_input_dialog, "");
-	dialog_set_prompt_maximum_characters(text_input_dialog, 2048);
-	dialog_add_button(text_input_dialog, "Cancel", true, "cancel", true);
-	dialog_add_button(text_input_dialog, "Send", true, "send", true);
-	dialog_set_default_button_index(text_input_dialog, 1);
-	dialog_set_enter_key_type(text_input_dialog, VIRTUALKEYBOARD_ENTER_SEND);
+	char *text = NULL;
 	text_input_active = 1;
 	text_input_vkb_suppressed = 1;
-	if(dialog_show(text_input_dialog) != BPS_SUCCESS){
-		text_input_active = 0;
-		text_input_vkb_suppressed = 0;
-		dialog_destroy(text_input_dialog);
-		text_input_dialog = NULL;
+	int result = system_prompt_run(&text);
+	text_input_active = 0;
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	text_input_guard_until_ns = timespec2nsec(&now) + 350000000ULL;
+	if(result > 0 && text != NULL && text[0] != '\0'){
+		buf_reset_view();
+		io_write_utf8_string(text, strlen(text));
 	}
+	free(text);
+	if(result < 0)
+		fprintf(stderr, "Could not complete system text prompt\n");
 }
 
+/* The patched SDL pump still exposes a dialog hook; the Qt prompt consumes
+ * its own completion event in its nested event loop. */
 void handleDialogEvent(bps_event_t *event)
 {
-	const char *text;
-	const char *context;
-
-	if(text_input_dialog == NULL ||
-	   dialog_event_get_dialog_instance(event) != text_input_dialog){
-		return;
-	}
-
-	/* A hardware Enter actions the default Send button.  Prefer its stable
-	 * context over visual/index ordering, which can vary with locale. */
-	context = dialog_event_get_selected_context(event);
-	text_input_active = 0;
-	{
-		struct timespec now;
-		clock_gettime(CLOCK_MONOTONIC, &now);
-		text_input_guard_until_ns = timespec2nsec(&now) + 350000000ULL;
-	}
-	if(context != NULL && strcmp(context, "send") == 0){
-		text = dialog_event_get_prompt_input_field(event);
-		if(text != NULL && text[0] != '\0'){
-			buf_reset_view();
-			io_write_utf8_string(text, strlen(text));
-		}
-	}
-
-	/* Keep the instance alive and reuse it on the next Meta+i.  The dialog
-	 * service hides it after the response; it is destroyed during uninit. */
+	(void)event;
 }
 
 int isTextInputBlocked(void)
@@ -924,6 +881,8 @@ static symmenu_t *get_keyhold_actions(int keycode) {
  * The back button sends configurable keystrokes (Esc by default). */
 int handleSyskeyEvent(int syskey)
 {
+	if(text_input_active)
+		return 0;
 	switch(syskey){
 	case NAVIGATOR_SYSKEY_BACK:
 		send_metamode_keystrokes(prefs->back_button_keys);
@@ -1494,9 +1453,6 @@ static int sdl_init() {
 		PRINT(stderr, "Couldn't initialize SDL: %s\n",SDL_GetError());
 		return TERM_FAILURE;
 	}
-	if(dialog_request_events(0) != BPS_SUCCESS){
-		fprintf(stderr, "Could not request dialog events\n");
-	}
 	PRINT(stderr, "Post SDL_Init()\n");
 
 	SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
@@ -1593,12 +1549,6 @@ static int sdl_init() {
 }
 
 void uninit(){
-	if(text_input_dialog != NULL){
-		dialog_cancel(text_input_dialog);
-		dialog_destroy(text_input_dialog);
-		text_input_dialog = NULL;
-	}
-	dialog_stop_events(0);
 
 	buf_uninit();
 
@@ -2199,6 +2149,8 @@ int run_render(void* data){
 
 int main(int argc, char **argv) {
 	int rc;
+	if(system_prompt_init(&argc, argv) != 0)
+		return TERM_FAILURE;
 
 	/* Switch to our home directory */
 	char* home = getenv("HOME");
@@ -2374,9 +2326,7 @@ int main(int argc, char **argv) {
 			touch_scroll_acc = 0;
 			break;
 		case SDL_USEREVENT:
-			/* posted by SDL for the app-menu request (swipe down from the
-			 * top bezel; the Classic menu key may arrive this way too):
-			 * toggle persistent alt mode */
+			/* App menu request from the top bezel. */
 			altsym_hold_toggle();
 			break;
 		case SDL_ACTIVEEVENT:

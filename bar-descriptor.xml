@@ -44,7 +44,7 @@
     </configuration>
 
     <name>Term49CX</name>
-    <versionNumber>1.0.16</versionNumber>
+    <versionNumber>1.0.26</versionNumber>
     <buildId>1</buildId>
 
     <!-- May have multiple values for each language. See samples or xsd schema file. -->
@@ -99,6 +99,6 @@
 
 
     <!-- Ensure that shared libraries in the package are found at run-time. -->
-    <env var="LD_LIBRARY_PATH" value="app/native/lib"/>
+    <env var="LD_LIBRARY_PATH" value="app/native/lib:/usr/lib/qt4/lib"/>
 
 </qnx>
