@@ -119,15 +119,6 @@ static char text_input_vkb_suppressed = 0;
  * is being dismissed. */
 static uint64_t text_input_guard_until_ns = 0;
 
-static void finish_text_input(void)
-{
-	struct timespec now;
-
-	text_input_active = 0;
-	clock_gettime(CLOCK_MONOTONIC, &now);
-	text_input_guard_until_ns = timespec2nsec(&now) + 350000000ULL;
-}
-
 static SDL_mutex *input_mutex = NULL;
 
 static int event_pipe[2];
@@ -157,13 +148,13 @@ static void show_text_input_dialog(void)
 		text_input_dialog = NULL;
 		return;
 	}
-	dialog_set_title_text(text_input_dialog, "输入文字");
-	dialog_set_prompt_message_text(text_input_dialog, "使用系统输入法输入，发送后写入终端");
-	dialog_set_prompt_input_placeholder(text_input_dialog, "在这里输入中文");
+	dialog_set_title_text(text_input_dialog, "Enter text");
+	dialog_set_prompt_message_text(text_input_dialog, "Use the system input method, then tap Send to enter text in the terminal.");
+	dialog_set_prompt_input_placeholder(text_input_dialog, "Type here");
 	dialog_set_prompt_input_field(text_input_dialog, "");
 	dialog_set_prompt_maximum_characters(text_input_dialog, 2048);
-	dialog_add_button(text_input_dialog, "取消", true, "cancel", true);
-	dialog_add_button(text_input_dialog, "发送", true, "send", true);
+	dialog_add_button(text_input_dialog, "Cancel", true, "cancel", true);
+	dialog_add_button(text_input_dialog, "Send", true, "send", true);
 	dialog_set_default_button_index(text_input_dialog, 1);
 	dialog_set_enter_key_type(text_input_dialog, VIRTUALKEYBOARD_ENTER_SEND);
 	text_input_active = 1;
@@ -181,24 +172,20 @@ void handleDialogEvent(bps_event_t *event)
 	const char *text;
 	const char *context;
 
-	if(event == NULL || bps_event_get_code(event) != DIALOG_RESPONSE ||
-	   text_input_dialog == NULL){
+	if(text_input_dialog == NULL ||
+	   dialog_event_get_dialog_instance(event) != text_input_dialog){
 		return;
-	}
-	/* This application owns only one BPS dialog.  While that prompt is active,
-	 * every dialog response must end its input session even if service-side
-	 * instance correlation is unavailable. */
-	if(dialog_event_get_dialog_instance(event) != text_input_dialog){
-		if(!text_input_active){
-			return;
-		}
-		fprintf(stderr, "Native IME response instance changed; accepting active response\n");
 	}
 
 	/* A hardware Enter actions the default Send button.  Prefer its stable
 	 * context over visual/index ordering, which can vary with locale. */
 	context = dialog_event_get_selected_context(event);
-	finish_text_input();
+	text_input_active = 0;
+	{
+		struct timespec now;
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		text_input_guard_until_ns = timespec2nsec(&now) + 350000000ULL;
+	}
 	if(context != NULL && strcmp(context, "send") == 0){
 		text = dialog_event_get_prompt_input_field(event);
 		if(text != NULL && text[0] != '\0'){
@@ -206,8 +193,9 @@ void handleDialogEvent(bps_event_t *event)
 			io_write_utf8_string(text, strlen(text));
 		}
 	}
-	/* Keep the dismissed instance alive and reuse it on the next Meta+i.  It is
-	 * destroyed during uninit. */
+
+	/* Keep the instance alive and reuse it on the next Meta+i.  The dialog
+	 * service hides it after the response; it is destroyed during uninit. */
 }
 
 int isTextInputBlocked(void)
@@ -806,15 +794,9 @@ void handle_virtualkeyboard_event(bps_event_t *event){
 
 	if(text_input_vkb_suppressed){
 		/* Since the terminal was not resized when this prompt appeared, its
-		 * matching HIDDEN notification must not resize it on dismissal.  Some
-		 * BB10 10.3.3 builds dismiss the prompt without delivering its dialog
-		 * response, so HIDDEN is also the reliable fallback that releases the
-		 * terminal input lock. */
+		 * matching HIDDEN notification must not resize it on dismissal. */
 		if(event_code == VIRTUALKEYBOARD_EVENT_HIDDEN){
 			text_input_vkb_suppressed = 0;
-			if(text_input_active){
-				finish_text_input();
-			}
 		}
 		return;
 	}
