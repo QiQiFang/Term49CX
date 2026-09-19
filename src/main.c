@@ -1029,7 +1029,7 @@ void handleKeyboardEvent(screen_event_t screen_event)
 	int32_t last_len = 0;
 	int32_t bs_i = 0;
 	size_t upcase_len = 0;
-	UChar backspace = 0x8;
+	UChar backspace = ERASE_CHAR;
 
 	if(text_input_active){
 		return;

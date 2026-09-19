@@ -36,6 +36,20 @@
 #define CHARACTER_BUFFER 10
 #define MIN_FONT_SIZE 4
 
+/* The byte the Backspace key sends: DEL (0x7f), the erase character every
+ * real terminal sends and the Unix default.  BS (0x08, Ctrl+H) erases one
+ * character in Unix line editors too, which is why it was used here
+ * originally, but it carries a different meaning on Windows.  Over
+ * OpenSSH/ConPTY, cmd.exe's console line editor reads a lone 0x08 as "throw
+ * away the whole input line" and PowerShell's PSReadLine reads it as
+ * "kill the word to the left" (both verified against Windows 11).  Every
+ * path that erases one character went through 0x08 - the Backspace key, the
+ * Meta-hold toggle erasing the space it just sent, and the key-hold upcase
+ * erasing the letter being replaced - so on Windows a single press wiped
+ * everything the user had typed.  DEL deletes exactly one character
+ * everywhere: cmd.exe, PSReadLine, Unix line editors and full-screen TUIs. */
+#define ERASE_CHAR 0x7f
+
 // sym = f0d3 // z = 0x007a
 #define KEYCODE_BB_ALT_KEY 0xF0E9
 #define KEYCODE_BB_SYM_KEY 0xF0D3

@@ -498,7 +498,7 @@ int ecma48_parse_control_codes(int sym, int mod, UChar* tbuf){
   // but if one of the modifier keys is down, we maybe do something different
   // Start by checking arrow keys and stuff
   switch (sym){
-  	case KEYCODE_BACKSPACE:		tbuf[0] = 010; break;
+  	case KEYCODE_BACKSPACE:		tbuf[0] = ERASE_CHAR; break;
   	case KEYCODE_TAB:
   		/* Shift+Tab sends back-tab (CSI Z) */
   		if((mod & KEYMOD_SHIFT) || (mod & KEYMOD_SHIFT_LOCK)){
