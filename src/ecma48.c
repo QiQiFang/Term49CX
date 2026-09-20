@@ -3340,21 +3340,26 @@ void ecma48_SGR(){
         case 63: break; // 63 ideogram double overline or double line on the left side
         case 64: break; // 64 ideogram stress marking
         case 65: break; // 65 cancels the effect parameter values 60 to 64
-        case 90: buf->current_style.fg_color = (SDL_Color)SDL_BLACK; break;
-        case 91: buf->current_style.fg_color = (SDL_Color)SDL_RED; break;
-        case 92: buf->current_style.fg_color = (SDL_Color)SDL_GREEN; break;
-        case 93: buf->current_style.fg_color = (SDL_Color)SDL_YELLOW; break;
-        case 94: buf->current_style.fg_color = (SDL_Color)SDL_BLUE; break;
-        case 95: buf->current_style.fg_color = (SDL_Color)SDL_MAGENTA; break;
-        case 96: buf->current_style.fg_color = (SDL_Color)SDL_CYAN; break;
+        // 90-97 是"亮"前景色组（xterm bright/bold），90 即 bright black = 灰。
+        // 很多现代 CLI 用 90 渲染次要/变暗的文字（Claude Code 的输入框就是一例），
+        // 映射成纯黑会在黑底上完全看不见。SDL_BT_* 宏本来就在 terminal.h 里定义好了
+        // （term_colors[8..15] 的值与它们一致），之前只是没接线。
+        case 90: buf->current_style.fg_color = (SDL_Color)SDL_BT_GRAY; break;
+        case 91: buf->current_style.fg_color = (SDL_Color)SDL_BT_RED; break;
+        case 92: buf->current_style.fg_color = (SDL_Color)SDL_BT_GREEN; break;
+        case 93: buf->current_style.fg_color = (SDL_Color)SDL_BT_YELLOW; break;
+        case 94: buf->current_style.fg_color = (SDL_Color)SDL_BT_BLUE; break;
+        case 95: buf->current_style.fg_color = (SDL_Color)SDL_BT_MAGENTA; break;
+        case 96: buf->current_style.fg_color = (SDL_Color)SDL_BT_CYAN; break;
         case 97: buf->current_style.fg_color = (SDL_Color)SDL_WHITE; break;
-        case 100: buf->current_style.bg_color = (SDL_Color)SDL_BLACK; break;
-        case 101: buf->current_style.bg_color = (SDL_Color)SDL_RED; break;
-        case 102: buf->current_style.bg_color = (SDL_Color)SDL_GREEN; break;
-        case 103: buf->current_style.bg_color = (SDL_Color)SDL_YELLOW; break;
-        case 104: buf->current_style.bg_color = (SDL_Color)SDL_BLUE; break;
-        case 105: buf->current_style.bg_color = (SDL_Color)SDL_MAGENTA; break;
-        case 106: buf->current_style.bg_color = (SDL_Color)SDL_CYAN; break;
+        // 100-107 是亮背景色组，同理
+        case 100: buf->current_style.bg_color = (SDL_Color)SDL_BT_GRAY; break;
+        case 101: buf->current_style.bg_color = (SDL_Color)SDL_BT_RED; break;
+        case 102: buf->current_style.bg_color = (SDL_Color)SDL_BT_GREEN; break;
+        case 103: buf->current_style.bg_color = (SDL_Color)SDL_BT_YELLOW; break;
+        case 104: buf->current_style.bg_color = (SDL_Color)SDL_BT_BLUE; break;
+        case 105: buf->current_style.bg_color = (SDL_Color)SDL_BT_MAGENTA; break;
+        case 106: buf->current_style.bg_color = (SDL_Color)SDL_BT_CYAN; break;
         case 107: buf->current_style.bg_color = (SDL_Color)SDL_WHITE; break;
         default: NIPRINT(stderr, " -- Unhandled SGR param: %d\n", Pn[i]);
       };
