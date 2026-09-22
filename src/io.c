@@ -42,6 +42,58 @@ static char readbuf[READ_BUFFER_SIZE];
 static char writebuf[CHARACTER_BUFFER * U8_MAX_LENGTH];
 static char* writebufLimit;
 
+/* Optional capture of the raw child byte stream, for diagnosing rendering
+ * problems. Enable BEFORE launching Term49CX with:
+ *     TERM49CX_CAPTURE=/accounts/.../data/capture.bin
+ * Off by default. The file is opened lazily on the first read so a normal
+ * run never touches the filesystem. What lands here is exactly what the
+ * child wrote to the pty -- escape sequences included -- so it can be
+ * replayed side by side with what the screen showed. */
+static FILE* capture_fp = NULL;
+static int capture_checked = 0;
+
+/* A trigger file is used rather than only an environment variable because the
+ * app is normally started from the home screen, where there is no shell to
+ * export anything. Create $HOME/.term49cx-capture-on (in Term49CX's sandbox
+ * data dir) and the next launch writes $HOME/term49cx-capture.bin. */
+#define CAPTURE_TRIGGER ".term49cx-capture-on"
+#define CAPTURE_OUTPUT  "term49cx-capture.bin"
+
+static void io_capture(const void* data, size_t n){
+  if(!capture_checked){
+    capture_checked = 1;
+    /* An explicit TERM49CX_CAPTURE still wins, for launches from a shell. */
+    const char* path = getenv("TERM49CX_CAPTURE");
+    char buf[512];
+    if(path == NULL || path[0] == '\0'){
+      const char* home = getenv("HOME");
+      if(home != NULL && home[0] != '\0'){
+        snprintf(buf, sizeof(buf), "%s/%s", home, CAPTURE_TRIGGER);
+        if(access(buf, F_OK) == 0){
+          snprintf(buf, sizeof(buf), "%s/%s", home, CAPTURE_OUTPUT);
+          path = buf;
+        } else {
+          path = NULL;
+        }
+      } else {
+        path = NULL;
+      }
+    }
+    if(path != NULL){
+      capture_fp = fopen(path, "wb");
+      if(capture_fp == NULL){
+        fprintf(stderr, "TERM49CX_CAPTURE: cannot open %s\n", path);
+      } else {
+        fprintf(stderr, "TERM49CX_CAPTURE: writing to %s\n", path);
+      }
+    }
+  }
+  if(capture_fp != NULL){
+    fwrite(data, 1, n, capture_fp);
+    fflush(capture_fp);
+  }
+}
+
 int io_init(pref_t *prefs){
 
 	// create converters
@@ -89,11 +141,16 @@ int32_t io_upcase_last_write(UChar **buf, int32_t nUChar){
 	targetLimit = c + CHARACTER_BUFFER;
 	source = writebuf;
 	sourceLimit = writebufLimit;
+	/* Same defect as io_read_master had: ICU returns immediately without
+	 * converting when the error code is already set, so only clearing
+	 * U_BUFFER_OVERFLOW left any other outcome stuck forever and made every
+	 * later call a silent no-op. Clear before and after, report the rest. */
+	tty_conv_err = U_ZERO_ERROR;
 	ucnv_toUnicode(tty_conv, &target, targetLimit, &source, sourceLimit, NULL, FALSE, &tty_conv_err);
-	if(tty_conv_err == U_BUFFER_OVERFLOW_ERROR){
-		fprintf(stderr, "ucnv_toUnicode() in io_upcase_last_write ran out of target buffer\n");
-		tty_conv_err = U_ZERO_ERROR;
+	if(tty_conv_err != U_ZERO_ERROR && tty_conv_err != U_BUFFER_OVERFLOW_ERROR){
+		fprintf(stderr, "ucnv_toUnicode() in io_upcase_last_write: error %d\n", (int)tty_conv_err);
 	}
+	tty_conv_err = U_ZERO_ERROR;
 	lCaseLen = (int32_t)(target - c);
 	uCaseLen = u_strToUpper(*buf, nUChar, c, lCaseLen, NULL, &uCaseErr);
 	if (uCaseLen > nUChar){
@@ -208,18 +265,31 @@ ssize_t io_read_master(UChar *buf, size_t nUChar){
 	}
 	// else
 
+	/* Capture the raw bytes before any charset conversion, so the file holds
+	 * exactly what the child wrote. */
+	io_capture(readbuf, (size_t)count);
+
 	source = readbuf;
 	sourceLimit = readbuf + count;
 
 	target = buf;
 	targetLimit = buf + nUChar;
 
+  /* Clear the error code before converting. ICU returns immediately without
+   * converting anything when the code is already set, so a single malformed
+   * sequence would otherwise leave tty_conv_err non-zero forever, turning
+   * every later call into a silent no-op that stalls all child output. The
+   * default substitution callback keeps going past a bad sequence, so the
+   * remainder of this read still gets converted. */
+  tty_conv_err = U_ZERO_ERROR;
   ucnv_toUnicode(tty_conv, &target, targetLimit, &source, sourceLimit, NULL, FALSE, &tty_conv_err);
 
-  if(tty_conv_err == U_BUFFER_OVERFLOW_ERROR){
-  	fprintf(stderr, "ucnv_toUnicode() in io_read_master ran out of target buffer\n");
-  	tty_conv_err = U_ZERO_ERROR;
+  if(tty_conv_err != U_ZERO_ERROR && tty_conv_err != U_BUFFER_OVERFLOW_ERROR){
+  	fprintf(stderr, "ucnv_toUnicode() in io_read_master: error %d\n", (int)tty_conv_err);
   }
+  /* Always clear it: only U_BUFFER_OVERFLOW used to be reset, anything else
+   * stuck and disabled the converter for the rest of the session. */
+  tty_conv_err = U_ZERO_ERROR;
 
   return (ssize_t)(target - buf);
 }

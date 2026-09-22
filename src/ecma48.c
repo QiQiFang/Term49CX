@@ -3397,7 +3397,11 @@ void ecma48_DSR(){
             snprintf(cpr, OUTBUF_LEN, "\033[%d;%dR",
                 buf_to_screen_row_origin(-1),
                 buf_to_screen_col(-1));
-            io_write_master_char(cpr, sizeof(cpr));
+            /* strlen, not sizeof: the buffer was just bzero'd, so sizeof
+             * would append OUTBUF_LEN - strlen(cpr) NUL bytes to every
+             * cursor-position report and inject them into the child's
+             * input stream. (case 5 above already uses strlen.) */
+            io_write_master_char(cpr, strlen(cpr));
             break;
     default: NIPRINT(stderr, "-- Unhandled code in ecma48_DSR: %d\n", Pn); break;
   }
